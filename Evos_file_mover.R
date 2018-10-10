@@ -2,6 +2,8 @@
 library(tidyverse)
 
 #Execute script from the plate level
+#Will create and copy png or tiff files from Beacon structure to well location structure
+#Requires meatdata file with Well and Beacon columns
 raw_data_path <-  getwd()
 plateDir <- str_remove(raw_data_path, ".*/")
 
@@ -13,6 +15,7 @@ metadata <- dir("Analysis/", pattern = "metadata", full.names = TRUE) %>%
   group_by(Well) %>%
   mutate(Location = row_number(),
          Well_Location = paste0(Well,"_",Location))
+if(nrow(metadata)==0) stop("No metadata file found in ", getwd(),"/Analysis/" )
 
 #Get a tibble of all files in the dataset and split to create metadata
 files<- tibble(Full_filename=dir(pattern = "GFP|TxRed", full.names = TRUE, recursive = TRUE)) %>%
