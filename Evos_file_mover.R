@@ -21,6 +21,7 @@ if(nrow(metadata)==0) stop("No metadata file found in ", getwd(),"/Analysis/" )
 
 #Get a tibble of all files in the dataset and split to create metadata
 files<- tibble(Full_filename=dir(pattern = "GFP|TxRed", full.names = TRUE, recursive = TRUE)) %>%
+  filter(str_detect(Full_filename, "Beacon")) %>%
   mutate(Filename = str_remove(Full_filename, ".*/"),
          Plate_Dir = plateDir,
          Channel = str_remove(Filename,"[[:alnum:]]*_{1}"),
@@ -50,6 +51,8 @@ copyFiles <- function(filename, well_location, to_filename){
 
 #update xml data in each tiff
 updateXML <- function(filenames){
+  filenames <- filenames[str_detect(filenames,"tif")]
+  if(is_empty(filenames)) return()
   foo <- lapply(filenames, function(filename){
     res <- system(paste0("evos_metadata ", filename))
     #if(!res==0) stop("error from evos_metadata call on ", filename)
