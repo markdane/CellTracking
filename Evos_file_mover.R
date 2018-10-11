@@ -2,8 +2,10 @@
 library(tidyverse)
 
 #Execute script from the plate level
-#Will create and copy png or tiff files from Beacon structure to well location structure
-#Requires meatdata file with Well and Beacon columns
+#Will create and copy png or tiff files from Beacon structure to well location structures
+#Copies well_location structure to eppec and creates channel_Unreg subdirectories
+#Requires meatdata file in Analysis subdirectory with Well and Beacon columns
+
 raw_data_path <-  getwd()
 plateDir <- str_remove(raw_data_path, ".*/")
 
@@ -46,6 +48,14 @@ copyFiles <- function(filename, well_location, to_filename){
   file.copy(filename, to_filepath)
 }
 
+#update xml data in each tiff
+updateXML <- function(filenames){
+  foo <- lapply(filenames, function(filename){
+    res <- system(paste0("evos_metadata ", filename))
+    #if(!res==0) stop("error from evos_metadata call on ", filename)
+  })
+}
+
 #create directories for each well + location
 foo <- files %>%
   select(Well_Location) %>%
@@ -57,5 +67,6 @@ foo <- files %>%
   foo <- files %>%
     select(Well_Location, Full_filename, To_Filename) %>%
     group_by(Well_Location) %>%
-  mutate(foo = copyFiles(Full_filename, Well_Location, To_Filename))
+  mutate(foo = updateXML(Full_filename),
+         foo = copyFiles(Full_filename, Well_Location, To_Filename))
 
