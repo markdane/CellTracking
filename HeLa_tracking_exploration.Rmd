@@ -23,12 +23,12 @@ library(tidyverse)
 ```{r get_data}
 
 #Read in a CSV with ilastik tracking data
-data_dir <- "/graylab/share/dane/"
+data_dir <- "/graylab/share/dane/CellTracking/"
 nuclear_dir_name <- "Red_Reg"
 reporter_dir_name <- "GFP_Reg"
-barcode <- "HeLa_1"
+barcode <- ""
 
-beacon_dirs <- dir(paste0(data_dir, barcode), pattern = "Beacon", full.names = TRUE)
+beacon_dirs <- dir(paste0(data_dir, barcode), pattern = "Beacon-42", full.names = TRUE)
 #Get the nuclear data
 raw_data <- lapply(beacon_dirs, function(beacon_dir){
   nuclear_data_filename <- dir(paste0(beacon_dir,"/",nuclear_dir_name),pattern = "CSV-Table", full.names = TRUE)
