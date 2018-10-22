@@ -41,4 +41,5 @@ rsconnect/
 *.png
 *.tif
 *.tiff
-
+*.h5
+*.csv
