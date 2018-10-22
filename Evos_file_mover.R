@@ -8,6 +8,8 @@ library(tidyverse)
 
 raw_data_path <-  getwd()
 plateDir <- str_remove(raw_data_path, ".*/")
+eppec_data_path <- paste0("/eppec/storage/groups/heiserlab/image_scratch/",plateDir)
+if(!dir.exists(eppec_data_path)) dir.create(eppec_data_path)
 
 #Read in the metadata file
 metadata <- dir("Analysis/", pattern = "metadata", full.names = TRUE) %>%
@@ -35,10 +37,12 @@ files<- tibble(Full_filename=dir(pattern = "GFP|TxRed", full.names = TRUE, recur
   mutate(
     To_Filename = paste0(Well_Location, "_", Channel, "_",Index, Filetype))
 
-createDirs <- function(dir_names, raw_data_path){
+createDirs <- function(dir_names, raw_data_path, eppec_data_path){
   foo <- lapply(dir_names, function(dir_name){
     full_dir_name <- paste0(raw_data_path,"/",dir_name)
+    full_eppec_dir_name <- paste0(eppec_data_path,"/",dir_name)
     if(!dir.exists(full_dir_name)) dir.create(full_dir_name)
+    if(!dir.exists(full_eppec_dir_name)) dir.create(full_eppec_dir_name)
     return(full_dir_name)
   })
 }
@@ -64,7 +68,7 @@ foo <- files %>%
   select(Well_Location) %>%
   distinct() %>%
   unlist() %>%
-  createDirs(raw_data_path)
+  createDirs(raw_data_path, eppec_data_path)
 
 #Move files to the correct directory
   foo <- files %>%
