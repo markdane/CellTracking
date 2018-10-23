@@ -20,25 +20,27 @@ library(tidyverse)
 
 ```
 
-```{r get_data}
+```{r get_data, , cache.lazy = FALSE}
 
 #Read in a CSV with ilastik tracking data
-data_dir <- "/graylab/share/dane/CellTracking/"
-nuclear_dir_name <- "Red_Reg"
+data_path <- "/eppec/storage/groups/heiserlab/image_scratch/"
+nuclear_dir_name <- "TxRed_Reg"
 reporter_dir_name <- "GFP_Reg"
-barcode <- ""
+barcode <- "HE_E_L_049_01_1"
 
-beacon_dirs <- dir(paste0(data_dir, barcode), pattern = "Beacon-42", full.names = TRUE)
+well_location_dirs <- dir(paste0(data_path, barcode), pattern = "[[:alnum:]]*_[[:digit:]]*", full.names = TRUE)
+message("DEBUG limiter in place")
 #Get the nuclear data
-raw_data <- lapply(beacon_dirs, function(beacon_dir){
-  nuclear_data_filename <- dir(paste0(beacon_dir,"/",nuclear_dir_name),pattern = "CSV-Table", full.names = TRUE)
-  if(is_empty(nuclear_data_filename)) stop("No nuclear data found in ", beacon_dir)
-  nuclear_data <- read_csv(nuclear_data_filename) 
-  nuclear_data$Location <- str_remove(beacon_dir, ".*/")
-  nuclear_data$Location_trackId <- paste(nuclear_data$Location, nuclear_data$trackId, sep="_")
+raw_data <- lapply(well_location_dirs, function(well_location_dir){
+  nuclear_data_filename <- dir(paste0(well_location_dir,"/",nuclear_dir_name),pattern = "CSV-Table", full.names = TRUE)
+  if(is_empty(nuclear_data_filename)) stop("No nuclear data found in ", well_location_dir)
+  nuclear_data <- read_csv(nuclear_data_filename) %>%
+    mutate(Location = str_remove(well_location_dir, ".*/"),
+           Well = str_remove(Location,"_.*"),
+           Location_trackId = str_c(Location, trackId))
   #Get the reporter data for the same image location
-  reporter_data_filename <- dir(paste0(beacon_dir,"/",reporter_dir_name),pattern = "CSV-Table", full.names = TRUE)
-  if(is_empty(reporter_data_filename)) stop("No reporter data found in ", beacon_dir)
+  reporter_data_filename <- dir(paste0(well_location_dir,"/",reporter_dir_name),pattern = "CSV-Table", full.names = TRUE)
+  if(is_empty(reporter_data_filename)) stop("No reporter data found in ", well_location_dir)
   reporter_data <- read_csv(reporter_data_filename)
   all_data <- nuclear_data %>%
     inner_join(reporter_data, by=c("frame", "Center_of_the_object_0", "Center_of_the_object_1"))
@@ -48,14 +50,21 @@ raw_data <- lapply(beacon_dirs, function(beacon_dir){
   #   anti_join(all_data, by=c("frame", "Center_of_the_object_0", "Center_of_the_object_1"))
   colnames(all_data) <- str_replace_all(colnames(all_data), "[.]x","_nuclear")
   colnames(all_data) <- str_replace_all(colnames(all_data), "[.]y","_reporter")
-  
 return(all_data)
-  
 }) %>%
   bind_rows()
 
+#addmetadata
+raw_data_metadata <- read_csv(paste0(data_path,"/",barcode,"/Analysis/",barcode,"_exp_metadata.csv")) %>%
+  select(matches("Well|CellLine-1$|Drug|Ligand|Reporter|Image")) %>%
+  distinct() %>%
+  left_join(raw_data, by=c("Well"))
 
-clean_data <- raw_data %>%
+colnames(raw_data_metadata)[str_detect(colnames(raw_data_metadata),"-")] <- str_replace_all(colnames(raw_data_metadata)[str_detect(colnames(raw_data_metadata),"-")], "-","_")
+raw_data_metadata <- mutate(raw_data_metadata, Time = frame*Image_period)
+
+
+clean_data <- raw_data_metadata %>%
   filter(lineageId_nuclear > 1,
          trackId_nuclear > 1) %>% #limit to valid tracks and lineages
   group_by(Location_trackId) %>%
@@ -75,28 +84,33 @@ clean_data <- raw_data %>%
   ungroup()
 
   #Get cyto data processed by EBImage
-cyto_data <- read_csv(paste0(beacon_dirs[1],"/Cyto_data.csv")) %>%
-  group_by(trackId_nuclear) %>%
-  mutate(Nuclei_b.mean_T0 = Nuclei_b.mean[frame==0],
-         Nuclei_b.mean_T0Norm = Nuclei_b.mean/Nuclei_b.mean_T0,
-         Cyto_b.mean_T0 = Cyto_b.mean[frame==0],
-         Cyto_b.mean_T0Norm = Cyto_b.mean/Cyto_b.mean_T0,
-         CytoNucleiRatio_b.mean = Nuclei_b.mean/Cyto_b.mean,
-         CytoNucleiRatio_b.mean_T0 = CytoNucleiRatio_b.mean[frame==0],
-         CytoNucleiRatio_b.mean_T0Norm = CytoNucleiRatio_b.mean/CytoNucleiRatio_b.mean_T0) %>%
-  ungroup()
+# cyto_data <- read_csv(paste0(beacon_dirs[1],"/Cyto_data.csv")) %>%
+#   group_by(trackId_nuclear) %>%
+#   mutate(Nuclei_b.mean_T0 = Nuclei_b.mean[frame==0],
+#          Nuclei_b.mean_T0Norm = Nuclei_b.mean/Nuclei_b.mean_T0,
+#          Cyto_b.mean_T0 = Cyto_b.mean[frame==0],
+#          Cyto_b.mean_T0Norm = Cyto_b.mean/Cyto_b.mean_T0,
+#          CytoNucleiRatio_b.mean = Nuclei_b.mean/Cyto_b.mean,
+#          CytoNucleiRatio_b.mean_T0 = CytoNucleiRatio_b.mean[frame==0],
+#          CytoNucleiRatio_b.mean_T0Norm = CytoNucleiRatio_b.mean/CytoNucleiRatio_b.mean_T0) %>%
+#   ungroup()
+
+
+
+
+#Debug on a subset of the data
+set.seed(42)
+clean_data_subset <- sample(unique(clean_data$Location_trackId), size = .1*length(unique(clean_data$Location_trackId)), replace = FALSE)
+clean_data_small <- clean_data %>%
+  filter(Location_trackId %in% clean_data_subset) %>%
+  arrange(Location, frame)
 
 ```
  
 Nuclei motion with a subset of the  data.  
  
 ```{r samplePlots, fig.width=12, fig.height=6}
- #Debug on a subset of the data
-set.seed(42)
-clean_data_subset <- sample(unique(clean_data$Location_trackId), size = 1000, replace = FALSE)
-clean_data_small <- clean_data %>%
-  filter(Location_trackId %in% clean_data_subset) %>%
-  arrange(Location, frame)
+
 
 p <- ggplot(clean_data_small, aes(x = Center_of_the_object_0, y = Center_of_the_object_1, colour = factor(trackId_nuclear))) + 
   geom_path(size=1.2) +
@@ -112,22 +126,21 @@ Cell counts that include divsion, appearance and disappearance. Tracks labeled a
 
 ```{r cellCount, fig.width=8, fig.height=6}
 
-df <- raw_data %>%
-  filter(lineageId_nuclear > 1,
-         trackId_nuclear > 1) %>%
-  group_by(Location, frame) %>%
+df <- raw_data_metadata %>%
+    filter(lineageId_nuclear > 1,
+         trackId_nuclear > 1) %>% #limit to valid tracks and lineages
+  group_by(Location, Time) %>%
   summarise(Cell_count = n())
 
-p <- ggplot(df, aes(x = frame, y = Cell_count)) +
+p <- ggplot(df, aes(x = Time, y = Cell_count)) +
   geom_line(alpha=.3, size=.8) +
   #coord_cartesian(ylim=c(2000,2300)) +
   guides(colour=FALSE) +
-  labs(title = "Cell Count over time",
-       y = "Count",
-       x = "Frame") +
+  labs(title = "Cell count over time",
+       y = "Cell Count",
+       x = unique(raw_data_metadata$Image_period_timeUnit)) +
   facet_wrap(~Location)
 p
-
 ```
 
 ```{r reporterheatmap, fig.width=8, fig.height=12, eval=FALSE}
@@ -147,55 +160,95 @@ p
 ```
 
 
-Mean nuclear intensity T0 normalized for all cells that are present during the entire experiment.  
+Mean nuclear intensity T0 normalized for a sampled set of cells that are present during the entire experiment.  
+
 ```{r nuclearIntensityByCell, fig.width=8, fig.height=6}
-df <- clean_data %>%
+df <- clean_data_small %>%
   group_by(Location_trackId) %>%
   arrange(Mean_Intensity_0_nuclear_T0Norm_Sum) %>%
   ungroup()
 
-p <- ggplot(df, aes(x = frame, y = log10(Mean_Intensity_0_nuclear_T0Norm), colour = factor(trackId_nuclear))) +
+p <- ggplot(df, aes(x = Time, y = log10(Mean_Intensity_0_nuclear_T0Norm), colour = factor(trackId_nuclear))) +
   geom_line(alpha=.3, size=.8) +
     guides(colour=FALSE) +
   labs(title = "nuclear intensity",
        y = "Nuclear intensity (normalized to T0)",
-       x = "Frame") + 
+      x = unique(raw_data_metadata$Image_period_timeUnit)) + 
   theme(axis.title.y=element_blank(),
         axis.text.y=element_blank(),
         axis.ticks.y=element_blank())+
   facet_wrap(~Location)
-p <- p + geom_smooth(aes(x = frame,  y = log10(Mean_Intensity_0_nuclear_T0Norm)),method = "lm", colour="black")
+p <- p + geom_smooth(colour="black")
 p
 
 ```
 
-Mean reporter intensity T0 normalized for all cells that are present during the entire experiment.  
+Mean reporter intensity T0 normalized for a sampled set of cells that are present during the entire experiment.  
 
 ```{r reporterIntensityByCell, fig.width=8, fig.height=6}
-df <- clean_data %>%
+df <- clean_data_small %>%
   group_by(Location_trackId) %>%
   arrange(Mean_Intensity_0_reporter_T0Norm_Sum) %>%
   ungroup()
 
-p <- ggplot(df, aes(x = frame, y = log10(Mean_Intensity_0_reporter_T0Norm), colour = factor(trackId_nuclear))) +
+p <- ggplot(df, aes(x = Time, y = log10(Mean_Intensity_0_reporter_T0Norm), colour = factor(trackId_nuclear))) +
   geom_line(alpha=.3, size=.8) +
-    guides(colour=FALSE) +
+  guides(colour=FALSE) +
   labs(title = "reporter intensity",
        y = "Reporter intensity (normalized to T0)",
-       x = "Frame") + 
+       x = unique(raw_data_metadata$Image_period_timeUnit)) + 
   # theme(axis.title.y=element_blank(),
   #       axis.text.y=element_blank(),
   #       axis.ticks.y=element_blank())+
-  facet_wrap(~Location)
-p <- p + geom_smooth(aes(x = frame,  y = log10(Mean_Intensity_0_reporter_T0Norm)), colour="black", method="lm")
+  facet_wrap(~Location+Ligand_1+Ligand_1_conc)
+p <- p + geom_smooth(colour="black")
 p
 
 ```
 
+Mean reporter intenisty at various doses
+```{r reporterIntensityByCellbyDose, fig.width=8, fig.height=6}
+df <- clean_data_small %>%
+  group_by(Location, Time) %>%
+  summarise(Mean_Intensity_0_reporter_T0Norm = mean(Mean_Intensity_0_reporter_T0Norm),
+            Ligand_1_conc = unique(Ligand_1_conc)) %>%
+  ungroup()
+
+p <- ggplot(df, aes(x = Time, y = Mean_Intensity_0_reporter_T0Norm, colour=Location)) +
+  geom_line() +
+    labs(title = "Reporter intensity",
+       y = "Reporter intensity (normalized to T0)",
+       x = unique(raw_data_metadata$Image_period_timeUnit))
+p
+
+df <- clean_data_small %>%
+  group_by(Well, Time) %>%
+  summarise(Mean_Intensity_0_reporter_T0Norm = mean(Mean_Intensity_0_reporter_T0Norm),
+                        Ligand_1_conc = unique(Ligand_1_conc)) %>%
+  ungroup()
+
+p <- ggplot(df, aes(x = Time, y = Mean_Intensity_0_reporter_T0Norm, colour=Well)) +
+  geom_line() + 
+    labs(title = "Reporter intensity dose responses",
+       y = "Reporter intensity (normalized to T0)",
+       x = unique(raw_data_metadata$Image_period_timeUnit)) 
+p
+
+p <- ggplot(df, aes(x = Time, y = Mean_Intensity_0_reporter_T0Norm, colour=factor(Ligand_1_conc))) +
+  geom_line() + 
+    labs(title = "Reporter intensity dose responses",
+       y = "Reporter intensity (normalized to T0)",
+       x = unique(raw_data_metadata$Image_period_timeUnit),
+       colour = "Ligand\nconcentration(ng/ml)") 
+p
+
+
+
+```
 
 Mean reporter intensity T0 normalized for all cells that are present during the entire experiment.  
 
-```{r cytoReporterIntensityCell, fig.width=8, fig.height=6}
+```{r cytoReporterIntensityCell, fig.width=8, fig.height=6, eval=FALSE}
 df <- cyto_data 
 
 
