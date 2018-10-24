@@ -15,7 +15,7 @@ Exploration of segmentation, tracking and processing of HeLa cells using Fiji fo
 ```{r "setup", include=FALSE}
 knitr::opts_chunk$set(fig.width=12, fig.height=8,
                       echo=FALSE, warning=FALSE, message=FALSE,
-                      cache=TRUE)
+                      cache=FALSE)
 library(tidyverse)
 
 ```
@@ -27,6 +27,14 @@ data_path <- "/eppec/storage/groups/heiserlab/image_scratch/"
 nuclear_dir_name <- "TxRed_Reg"
 reporter_dir_name <- "GFP_Reg"
 barcode <- "HE_E_L_049_01_1"
+
+#Filter thresholds
+max_nuclear_diff <- .25
+min_nuclear_diff <- -.25
+max_reporter_diff <- .25
+min_reporter_diff <- -.25
+max_nuclear_dis <- 2
+max_Size_in_pixels_0_nuclear <- 225
 
 well_location_dirs <- dir(paste0(data_path, barcode), pattern = "[[:alnum:]]*_[[:digit:]]*", full.names = TRUE)
 message("DEBUG limiter in place")
@@ -64,7 +72,7 @@ colnames(raw_data_metadata)[str_detect(colnames(raw_data_metadata),"-")] <- str_
 raw_data_metadata <- mutate(raw_data_metadata, Time = frame*Image_period)
 
 
-clean_data <- raw_data_metadata %>%
+clean_processed_data <- raw_data_metadata %>%
   filter(lineageId_nuclear > 1,
          trackId_nuclear > 1) %>% #limit to valid tracks and lineages
   group_by(Location_trackId) %>%
@@ -80,7 +88,23 @@ clean_data <- raw_data_metadata %>%
   mutate(Mean_Intensity_0_reporter_Sum = sum(Mean_Intensity_0_reporter),
          Mean_Intensity_0_reporter_T0 = Mean_Intensity_0_reporter[frame==0],
          Mean_Intensity_0_reporter_T0Norm = Mean_Intensity_0_reporter/Mean_Intensity_0_reporter_T0,
-         Mean_Intensity_0_reporter_T0Norm_Sum = sum(Mean_Intensity_0_reporter_T0Norm)) %>%
+         Mean_Intensity_0_reporter_T0Norm_Sum = sum(Mean_Intensity_0_reporter_T0Norm),
+         Movement_0_nuclear = c(diff(Center_of_the_object_0),0),
+         Movement_1_nuclear = c(diff(Center_of_the_object_1),0),
+         Distance_01_nuclear = sqrt(Movement_0_nuclear^2 + Movement_1_nuclear^2)) %>%
+  ungroup()
+
+#Intensity filter
+#Calculate changes in intensity
+clean_data <- clean_processed_data %>%
+  group_by(Location_trackId) %>%
+  arrange(Time) %>%
+  mutate(Mean_Intensity_0_nuclear_T0Norm_diff =  c(diff(Mean_Intensity_0_nuclear_T0Norm),0),
+         Mean_Intensity_0_reporter_T0Norm_diff =  c(diff(Mean_Intensity_0_reporter_T0Norm),0)) %>%
+  filter(Mean_Intensity_0_nuclear_T0Norm_diff > max_nuclear_diff|Mean_Intensity_0_nuclear_T0Norm_diff < min_nuclear_diff|Mean_Intensity_0_reporter_T0Norm_diff > max_reporter_diff|Mean_Intensity_0_reporter_T0Norm_diff < min_reporter_diff|Distance_01_nuclear > max_nuclear_dis|Size_in_pixels_0_nuclear > max_Size_in_pixels_0_nuclear) %>%
+  select(Location_trackId) %>%
+  distinct() %>%
+  anti_join(clean_processed_data,.) %>%
   ungroup()
 
   #Get cyto data processed by EBImage
@@ -94,9 +118,6 @@ clean_data <- raw_data_metadata %>%
 #          CytoNucleiRatio_b.mean_T0 = CytoNucleiRatio_b.mean[frame==0],
 #          CytoNucleiRatio_b.mean_T0Norm = CytoNucleiRatio_b.mean/CytoNucleiRatio_b.mean_T0) %>%
 #   ungroup()
-
-
-
 
 #Debug on a subset of the data
 set.seed(42)
@@ -168,15 +189,12 @@ df <- clean_data_small %>%
   arrange(Mean_Intensity_0_nuclear_T0Norm_Sum) %>%
   ungroup()
 
-p <- ggplot(df, aes(x = Time, y = log10(Mean_Intensity_0_nuclear_T0Norm), colour = factor(trackId_nuclear))) +
+p <- ggplot(df, aes(x = Time, y = Mean_Intensity_0_nuclear_T0Norm, colour = factor(trackId_nuclear))) +
   geom_line(alpha=.3, size=.8) +
     guides(colour=FALSE) +
   labs(title = "nuclear intensity",
        y = "Nuclear intensity (normalized to T0)",
       x = unique(raw_data_metadata$Image_period_timeUnit)) + 
-  theme(axis.title.y=element_blank(),
-        axis.text.y=element_blank(),
-        axis.ticks.y=element_blank())+
   facet_wrap(~Location)
 p <- p + geom_smooth(colour="black")
 p
@@ -191,7 +209,7 @@ df <- clean_data_small %>%
   arrange(Mean_Intensity_0_reporter_T0Norm_Sum) %>%
   ungroup()
 
-p <- ggplot(df, aes(x = Time, y = log10(Mean_Intensity_0_reporter_T0Norm), colour = factor(trackId_nuclear))) +
+p <- ggplot(df, aes(x = Time, y = Mean_Intensity_0_reporter_T0Norm, colour = factor(trackId_nuclear))) +
   geom_line(alpha=.3, size=.8) +
   guides(colour=FALSE) +
   labs(title = "reporter intensity",
