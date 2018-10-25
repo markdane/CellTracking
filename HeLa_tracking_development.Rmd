@@ -15,8 +15,16 @@ Exploration of segmentation, tracking and processing of HeLa cells using Fiji fo
 ```{r "setup", include=FALSE}
 knitr::opts_chunk$set(fig.width=12, fig.height=8,
                       echo=FALSE, warning=FALSE, message=FALSE,
-                      cache=FALSE)
+                      cache=TRUE)
 library(tidyverse)
+library(RColorBrewer)
+library(gplots)
+library(scales)
+
+
+#Setup colors
+spectralPal <- brewer.pal(11,"Spectral")[11:1]
+
 
 ```
 
@@ -37,7 +45,7 @@ max_nuclear_dis <- 2
 max_Size_in_pixels_0_nuclear <- 225
 
 well_location_dirs <- dir(paste0(data_path, barcode), pattern = "[[:alnum:]]*_[[:digit:]]*", full.names = TRUE)
-message("DEBUG limiter in place")
+#message("DEBUG limiter in place")
 #Get the nuclear data
 raw_data <- lapply(well_location_dirs, function(well_location_dir){
   nuclear_data_filename <- dir(paste0(well_location_dir,"/",nuclear_dir_name),pattern = "CSV-Table", full.names = TRUE)
@@ -72,51 +80,62 @@ colnames(raw_data_metadata)[str_detect(colnames(raw_data_metadata),"-")] <- str_
 raw_data_metadata <- mutate(raw_data_metadata, Time = frame*Image_period)
 
 
-clean_processed_data <- raw_data_metadata %>%
+processing1 <- raw_data_metadata %>%
   filter(lineageId_nuclear > 1,
          trackId_nuclear > 1) %>% #limit to valid tracks and lineages
   group_by(Location_trackId) %>%
   mutate(Track_length = n()) %>%
-  ungroup() %>%
+  ungroup() %>% 
   #remove dividing, disappearing and appearing cells
   filter(Track_length==max(length(unique(frame)))) %>% 
   group_by(Location_trackId) %>%
-  mutate(Mean_Intensity_0_nuclear_Sum = sum(Mean_Intensity_0_nuclear),
+  mutate(Mean_Intensity_0_nuclear_sum = sum(Mean_Intensity_0_nuclear),
          Mean_Intensity_0_nuclear_T0 = Mean_Intensity_0_nuclear[frame==0],
-         Mean_Intensity_0_nuclear_T0Norm = Mean_Intensity_0_nuclear/Mean_Intensity_0_nuclear_T0,
-         Mean_Intensity_0_nuclear_T0Norm_Sum = sum(Mean_Intensity_0_nuclear_T0Norm)) %>%
-  mutate(Mean_Intensity_0_reporter_Sum = sum(Mean_Intensity_0_reporter),
+         Mean_Intensity_0_nuclear_T0norm = Mean_Intensity_0_nuclear/Mean_Intensity_0_nuclear_T0,
+         Mean_Intensity_0_nuclear_T0norm_sum = sum(Mean_Intensity_0_nuclear_T0norm)) %>%
+  mutate(Mean_Intensity_0_reporter_sum = sum(Mean_Intensity_0_reporter),
          Mean_Intensity_0_reporter_T0 = Mean_Intensity_0_reporter[frame==0],
-         Mean_Intensity_0_reporter_T0Norm = Mean_Intensity_0_reporter/Mean_Intensity_0_reporter_T0,
-         Mean_Intensity_0_reporter_T0Norm_Sum = sum(Mean_Intensity_0_reporter_T0Norm),
+         Mean_Intensity_0_reporter_T0norm = Mean_Intensity_0_reporter/Mean_Intensity_0_reporter_T0,
+         Mean_Intensity_0_reporter_T0norm_sum = sum(Mean_Intensity_0_reporter_T0norm),
          Movement_0_nuclear = c(diff(Center_of_the_object_0),0),
          Movement_1_nuclear = c(diff(Center_of_the_object_1),0),
          Distance_01_nuclear = sqrt(Movement_0_nuclear^2 + Movement_1_nuclear^2)) %>%
   ungroup()
+
+clean_processed_data <- processing1 %>%
+  group_by(Well) %>%
+  select(Location_trackId, Mean_Intensity_0_reporter_T0norm_sum, Well) %>%
+  distinct() %>%
+  arrange(desc(Mean_Intensity_0_reporter_T0norm_sum)) %>%
+  group_by(Well) %>%
+  mutate(Mean_Intensity_0_reporter_T0norm_sum_rank = row_number()) %>%
+  ungroup() %>%
+  select(Location_trackId, Mean_Intensity_0_reporter_T0norm_sum_rank) %>%
+  left_join(processing1, by="Location_trackId")
 
 #Intensity filter
 #Calculate changes in intensity
 clean_data <- clean_processed_data %>%
   group_by(Location_trackId) %>%
   arrange(Time) %>%
-  mutate(Mean_Intensity_0_nuclear_T0Norm_diff =  c(diff(Mean_Intensity_0_nuclear_T0Norm),0),
-         Mean_Intensity_0_reporter_T0Norm_diff =  c(diff(Mean_Intensity_0_reporter_T0Norm),0)) %>%
-  filter(Mean_Intensity_0_nuclear_T0Norm_diff > max_nuclear_diff|Mean_Intensity_0_nuclear_T0Norm_diff < min_nuclear_diff|Mean_Intensity_0_reporter_T0Norm_diff > max_reporter_diff|Mean_Intensity_0_reporter_T0Norm_diff < min_reporter_diff|Distance_01_nuclear > max_nuclear_dis|Size_in_pixels_0_nuclear > max_Size_in_pixels_0_nuclear) %>%
+  mutate(Mean_Intensity_0_nuclear_T0norm_diff =  c(diff(Mean_Intensity_0_nuclear_T0norm),0),
+         Mean_Intensity_0_reporter_T0norm_diff =  c(diff(Mean_Intensity_0_reporter_T0norm),0)) %>%
+  filter(Mean_Intensity_0_nuclear_T0norm_diff > max_nuclear_diff|Mean_Intensity_0_nuclear_T0norm_diff < min_nuclear_diff|Mean_Intensity_0_reporter_T0norm_diff > max_reporter_diff|Mean_Intensity_0_reporter_T0norm_diff < min_reporter_diff|Distance_01_nuclear > max_nuclear_dis|Size_in_pixels_0_nuclear > max_Size_in_pixels_0_nuclear) %>%
   select(Location_trackId) %>%
   distinct() %>%
-  anti_join(clean_processed_data,.) %>%
+  anti_join(clean_processed_data,., by = "Location_trackId") %>%
   ungroup()
 
   #Get cyto data processed by EBImage
 # cyto_data <- read_csv(paste0(beacon_dirs[1],"/Cyto_data.csv")) %>%
 #   group_by(trackId_nuclear) %>%
 #   mutate(Nuclei_b.mean_T0 = Nuclei_b.mean[frame==0],
-#          Nuclei_b.mean_T0Norm = Nuclei_b.mean/Nuclei_b.mean_T0,
+#          Nuclei_b.mean_T0norm = Nuclei_b.mean/Nuclei_b.mean_T0,
 #          Cyto_b.mean_T0 = Cyto_b.mean[frame==0],
-#          Cyto_b.mean_T0Norm = Cyto_b.mean/Cyto_b.mean_T0,
+#          Cyto_b.mean_T0norm = Cyto_b.mean/Cyto_b.mean_T0,
 #          CytoNucleiRatio_b.mean = Nuclei_b.mean/Cyto_b.mean,
 #          CytoNucleiRatio_b.mean_T0 = CytoNucleiRatio_b.mean[frame==0],
-#          CytoNucleiRatio_b.mean_T0Norm = CytoNucleiRatio_b.mean/CytoNucleiRatio_b.mean_T0) %>%
+#          CytoNucleiRatio_b.mean_T0norm = CytoNucleiRatio_b.mean/CytoNucleiRatio_b.mean_T0) %>%
 #   ungroup()
 
 #Debug on a subset of the data
@@ -164,20 +183,63 @@ p <- ggplot(df, aes(x = Time, y = Cell_count)) +
 p
 ```
 
-```{r reporterheatmap, fig.width=8, fig.height=12, eval=FALSE}
-df <- clean_data
+```{r reporterheatmap, fig.width=6, fig.height=9, eval=TRUE}
+#Heatmap with time columns and location)trackId rows, colour based on reporter intensity
+loProb <- quantile(clean_data$Mean_Intensity_0_reporter_T0norm, probs=.02)
+highProb <- quantile(clean_data$Mean_Intensity_0_reporter_T0norm, probs=.98)
 
-p <- ggplot(df, aes(x = frame, y = log10(Mean_Intensity_0_reporter_T0Norm_Sum), colour = Mean_Intensity_0_reporter_T0Norm)) +
-  geom_tile() +
-  labs(title = "Normalized reporter intensity",
-       y = "Cell track ID",
-       x = "Frame") + 
-  theme(axis.title.y=element_blank(),
-        axis.text.y=element_blank(),
-        axis.ticks.y=element_blank()) +
-  facet_wrap(~Location)
+df <- clean_data %>%
+  #filter(Well=="A1") %>%
+  mutate(Mean_Intensity_0_reporter_T0norm = scales::squish(Mean_Intensity_0_reporter_T0norm, range = c(loProb, highProb)),
+         facet_label = paste0(Well," " ,Ligand_1,": ", Ligand_1_conc," ", Ligand_1_concUnit))
+  
+
+p <- ggplot(df, aes(x=Time, y = Mean_Intensity_0_reporter_T0norm_sum_rank,
+                    fill = Mean_Intensity_0_reporter_T0norm,
+                    colour = Mean_Intensity_0_reporter_T0norm)) + 
+  geom_tile() + 
+  scale_fill_distiller(palette = "Spectral") + 
+  scale_colour_distiller(palette = "Spectral") + 
+  scale_y_reverse() + 
+  guides(colour=FALSE) +
+  labs(x = "Time (minutes)",
+       y = "Cells",
+       fill = "Intensity",
+       title = "Reporter intensity (T0 norm)") +
+  theme_bw(base_size = ) + 
+  theme(axis.text.y=element_blank(),
+        axis.ticks.y=element_blank(),
+        panel.border = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.line = element_line(colour = "black"))+
+  facet_wrap(~facet_label)
 p
 
+# for(well in unique(clean_data_small$Well)){
+#   dm <- clean_data_small %>%
+#     filter(Well == well) %>%
+#     select(Location_trackId, Time, Mean_Intensity_0_reporter_T0norm, Mean_Intensity_0_reporter_sum) %>%
+#     arrange(Time, desc(Mean_Intensity_0_reporter_sum), Location_trackId) %>%
+#     select(Mean_Intensity_0_reporter_T0norm) %>%
+#     unlist() %>%
+#     matrix(ncol = length(unique(clean_data_small$Time)))
+#   
+#   colnames(dm) <- unique(clean_data_small$Time)
+#   
+#   hmo <- heatmap.2(dm,
+#                    dendrogram = "none",
+#                    Rowv=FALSE,
+#                    Colv = FALSE,
+#                    #RowSideColors = ggCols[cldf$KMeanFirstcl3[cellIntFirst$Cell]],
+#                    trace="none",
+#                    key = FALSE,
+#                    col = spectralPal,
+#                    labCol=FALSE,
+#                    labRow = FALSE,
+#                    main = "T0 normalized reporter intensity",
+#                    ylab="Cells")
+#}
 ```
 
 
@@ -186,10 +248,10 @@ Mean nuclear intensity T0 normalized for a sampled set of cells that are present
 ```{r nuclearIntensityByCell, fig.width=8, fig.height=6}
 df <- clean_data_small %>%
   group_by(Location_trackId) %>%
-  arrange(Mean_Intensity_0_nuclear_T0Norm_Sum) %>%
+  arrange(Mean_Intensity_0_nuclear_T0norm_sum) %>%
   ungroup()
 
-p <- ggplot(df, aes(x = Time, y = Mean_Intensity_0_nuclear_T0Norm, colour = factor(trackId_nuclear))) +
+p <- ggplot(df, aes(x = Time, y = Mean_Intensity_0_nuclear_T0norm, colour = factor(trackId_nuclear))) +
   geom_line(alpha=.3, size=.8) +
     guides(colour=FALSE) +
   labs(title = "nuclear intensity",
@@ -206,10 +268,10 @@ Mean reporter intensity T0 normalized for a sampled set of cells that are presen
 ```{r reporterIntensityByCell, fig.width=8, fig.height=6}
 df <- clean_data_small %>%
   group_by(Location_trackId) %>%
-  arrange(Mean_Intensity_0_reporter_T0Norm_Sum) %>%
+  arrange(Mean_Intensity_0_reporter_T0norm_sum) %>%
   ungroup()
 
-p <- ggplot(df, aes(x = Time, y = Mean_Intensity_0_reporter_T0Norm, colour = factor(trackId_nuclear))) +
+p <- ggplot(df, aes(x = Time, y = Mean_Intensity_0_reporter_T0norm, colour = factor(trackId_nuclear))) +
   geom_line(alpha=.3, size=.8) +
   guides(colour=FALSE) +
   labs(title = "reporter intensity",
@@ -228,11 +290,11 @@ Mean reporter intenisty at various doses
 ```{r reporterIntensityByCellbyDose, fig.width=8, fig.height=6}
 df <- clean_data_small %>%
   group_by(Location, Time) %>%
-  summarise(Mean_Intensity_0_reporter_T0Norm = mean(Mean_Intensity_0_reporter_T0Norm),
+  summarise(Mean_Intensity_0_reporter_T0norm = mean(Mean_Intensity_0_reporter_T0norm),
             Ligand_1_conc = unique(Ligand_1_conc)) %>%
   ungroup()
 
-p <- ggplot(df, aes(x = Time, y = Mean_Intensity_0_reporter_T0Norm, colour=Location)) +
+p <- ggplot(df, aes(x = Time, y = Mean_Intensity_0_reporter_T0norm, colour=Location)) +
   geom_line() +
     labs(title = "Reporter intensity",
        y = "Reporter intensity (normalized to T0)",
@@ -241,18 +303,18 @@ p
 
 df <- clean_data_small %>%
   group_by(Well, Time) %>%
-  summarise(Mean_Intensity_0_reporter_T0Norm = mean(Mean_Intensity_0_reporter_T0Norm),
+  summarise(Mean_Intensity_0_reporter_T0norm = mean(Mean_Intensity_0_reporter_T0norm),
                         Ligand_1_conc = unique(Ligand_1_conc)) %>%
   ungroup()
 
-p <- ggplot(df, aes(x = Time, y = Mean_Intensity_0_reporter_T0Norm, colour=Well)) +
+p <- ggplot(df, aes(x = Time, y = Mean_Intensity_0_reporter_T0norm, colour=Well)) +
   geom_line() + 
     labs(title = "Reporter intensity dose responses",
        y = "Reporter intensity (normalized to T0)",
        x = unique(raw_data_metadata$Image_period_timeUnit)) 
 p
 
-p <- ggplot(df, aes(x = Time, y = Mean_Intensity_0_reporter_T0Norm, colour=factor(Ligand_1_conc))) +
+p <- ggplot(df, aes(x = Time, y = Mean_Intensity_0_reporter_T0norm, colour=factor(Ligand_1_conc))) +
   geom_line() + 
     labs(title = "Reporter intensity dose responses",
        y = "Reporter intensity (normalized to T0)",
@@ -306,23 +368,23 @@ p
 p <- p + geom_smooth(aes(x = frame,  y = log10(Cyto_b.mean/Nuclei_b.mean)), colour="black", method="lm")
 p
 
- p <- ggplot(df, aes(x = frame, y = log10(Nuclei_b.mean_T0Norm), colour = factor(trackId_nuclear))) +
+ p <- ggplot(df, aes(x = frame, y = log10(Nuclei_b.mean_T0norm), colour = factor(trackId_nuclear))) +
   geom_point(alpha=.3, size=.8) +
     guides(colour=FALSE) +
   labs(title = "Mean reporter intensity in the nucleus",
        y = "Reporter intensity",
        x = "Frame") 
-p <- p + geom_smooth(aes(x = frame,  y = log10(Nuclei_b.mean_T0Norm)), colour="black", method="lm")
+p <- p + geom_smooth(aes(x = frame,  y = log10(Nuclei_b.mean_T0norm)), colour="black", method="lm")
 p
 
 
- p <- ggplot(df, aes(x = frame, y = CytoNucleiRatio_b.mean_T0Norm, colour = factor(trackId_nuclear))) +
+ p <- ggplot(df, aes(x = frame, y = CytoNucleiRatio_b.mean_T0norm, colour = factor(trackId_nuclear))) +
   geom_point(alpha=.3, size=.8) +
     guides(colour=FALSE) +
   labs(title = "Mean reporter intensity ratio cyto/nucleus",
        y = "Reporter intensity",
        x = "Frame") 
-p <- p + geom_smooth(aes(x = frame,  y = CytoNucleiRatio_b.mean_T0Norm), colour="black", method="loess")
+p <- p + geom_smooth(aes(x = frame,  y = CytoNucleiRatio_b.mean_T0norm), colour="black", method="loess")
 p
 
 
