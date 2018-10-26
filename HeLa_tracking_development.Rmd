@@ -41,7 +41,7 @@ max_nuclear_diff <- .25
 min_nuclear_diff <- -.25
 max_reporter_diff <- .25
 min_reporter_diff <- -.25
-max_nuclear_dis <- 2
+max_nuclear_dis <- 100
 max_Size_in_pixels_0_nuclear <- 225
 
 well_location_dirs <- dir(paste0(data_path, barcode), pattern = "[[:alnum:]]*_[[:digit:]]*", full.names = TRUE)
@@ -97,11 +97,107 @@ processing1 <- raw_data_metadata %>%
          Mean_Intensity_0_reporter_T0 = Mean_Intensity_0_reporter[frame==0],
          Mean_Intensity_0_reporter_T0norm = Mean_Intensity_0_reporter/Mean_Intensity_0_reporter_T0,
          Mean_Intensity_0_reporter_T0norm_sum = sum(Mean_Intensity_0_reporter_T0norm),
-         Movement_0_nuclear = c(diff(Center_of_the_object_0),0),
-         Movement_1_nuclear = c(diff(Center_of_the_object_1),0),
+         Movement_0_nuclear = c(diff(Object_Center_0_nuclear),0),
+         Movement_1_nuclear = c(diff(Object_Center_1_nuclear),0),
          Distance_01_nuclear = sqrt(Movement_0_nuclear^2 + Movement_1_nuclear^2),
          facet_label = paste0(Well," " ,Ligand_1,": ", Ligand_1_conc," ", Ligand_1_concUnit)) %>%
   ungroup()
+
+```
+
+
+
+
+```{r evaluateOutliers, fig.width=4, fig.height=4}
+
+#Filter thresholds
+max_nuclear_dis <- 10
+
+#identify outliers based on size, motion and change in intensity
+df <- processing1 %>%
+  filter(!Distance_01_nuclear==0)
+p <- ggplot(processing1, aes(x = Distance_01_nuclear)) + 
+  geom_histogram(binwidth = .02) +
+  coord_cartesian(x = c(0,2))+
+  labs(title = "Distance moved between frames",
+       x = "pixels")
+p
+
+df <- processing1 %>%
+  filter(Distance_01_nuclear >=2)
+p <- ggplot(df, aes(x = Distance_01_nuclear)) + 
+  geom_histogram(binwidth = 1) +
+  geom_vline(xintercept = max_nuclear_dis, color="blue")+
+  coord_cartesian(x = c(2,100))+
+  labs(title = "Distance moved between frames",
+       x = "pixels")
+p
+
+#identify outliers based on size, motion and change in intensity
+mean_size_in_pixels = mean(processing1$Size_in_pixels_0_reporter)
+sd_size_in_pixels = sd(processing1$Size_in_pixels_0_reporter)
+
+p <- ggplot(processing1, aes(x = Size_in_pixels_0_reporter)) + 
+  geom_histogram(binwidth = 1) +
+  geom_vline(xintercept = mean_size_in_pixels+3*sd_size_in_pixels, colour="blue")+
+    geom_vline(xintercept = mean_size_in_pixels-3*sd_size_in_pixels, colour="blue")+
+  #coord_cartesian(x = c(0,2))+
+  labs(title = "Size in pixels in each frame",
+       subtitle = "mean +/- 3sd shown in blue",
+       x = "pixels")
+p
+
+#identify outliers based on size, motion and change in intensity
+mean_Mean_Intensity_0_reporter_T0norm = mean(processing1$Mean_Intensity_0_reporter_T0norm)
+sd_Mean_Intensity_0_reporter_T0norm = sd(processing1$Mean_Intensity_0_reporter_T0norm)
+
+p <- ggplot(processing1, aes(x = Mean_Intensity_0_reporter_T0norm)) + 
+  geom_histogram(binwidth = .02) +
+  geom_vline(xintercept = mean_Mean_Intensity_0_reporter_T0norm+3*sd_Mean_Intensity_0_reporter_T0norm, colour="blue")+
+    geom_vline(xintercept = mean_Mean_Intensity_0_reporter_T0norm-3*sd_Mean_Intensity_0_reporter_T0norm, colour="blue")+
+  #coord_cartesian(x = c(0,2))+
+  labs(title = "Normalized reporter intensity in each frame",
+       subtitle = "mean +/- 3sd shown in blue",
+       x = "intensity")
+p
+
+df <- processing1 %>%
+  filter(Distance_01_nuclear >=2)
+p <- ggplot(df, aes(x = Distance_01_nuclear)) + 
+  geom_histogram(binwidth = 1) +
+  geom_vline(xintercept = 10, color="blue")+
+  coord_cartesian(x = c(2,100))+
+  labs(title = "Distance moved between frames",
+       x = "pixels")
+p
+
+df <- processing1 %>%
+  filter(Distance_01_nuclear >=10)
+#Show traces that are being filtered
+p <- ggplot(df, aes(x = Center_of_the_object_0, y = Center_of_the_object_1, colour = factor(trackId_nuclear))) + 
+  geom_path(size=.5) +
+  guides(colour=FALSE) +
+  scale_y_reverse() +
+  labs(title = "Motion over time of filtered tracks") +
+  facet_wrap(~Location)
+p
+
+
+df <-  processing1 %>%
+  filter(Distance_01_nuclear <10)
+
+#Show traces that are not being filtered
+p <- ggplot(df, aes(x = Center_of_the_object_0, y = Center_of_the_object_1, colour = factor(trackId_nuclear))) + 
+  geom_path(size=.5) +
+  guides(colour=FALSE) +
+  scale_y_reverse() +
+  labs(title = "Motion over time of tracks in dataset") +
+  facet_wrap(~Location)
+p
+
+```
+
+```{r}
 
 clean_processed_data <- processing1 %>%
   group_by(Well) %>%
@@ -121,7 +217,7 @@ clean_data <- clean_processed_data %>%
   arrange(Time) %>%
   mutate(Mean_Intensity_0_nuclear_T0norm_diff =  c(diff(Mean_Intensity_0_nuclear_T0norm),0),
          Mean_Intensity_0_reporter_T0norm_diff =  c(diff(Mean_Intensity_0_reporter_T0norm),0)) %>%
-  filter(Mean_Intensity_0_nuclear_T0norm_diff > max_nuclear_diff|Mean_Intensity_0_nuclear_T0norm_diff < min_nuclear_diff|Mean_Intensity_0_reporter_T0norm_diff > max_reporter_diff|Mean_Intensity_0_reporter_T0norm_diff < min_reporter_diff|Distance_01_nuclear > max_nuclear_dis|Size_in_pixels_0_nuclear > max_Size_in_pixels_0_nuclear) %>%
+  filter(Mean_Intensity_0_reporter_T0norm > mean_Mean_Intensity_0_reporter_T0norm+3*sd_Mean_Intensity_0_reporter_T0norm|Mean_Intensity_0_reporter_T0norm <mean_Mean_Intensity_0_reporter_T0norm-3*sd_Mean_Intensity_0_reporter_T0norm|Distance_01_nuclear > max_nuclear_dis|Size_in_pixels_0_nuclear > mean_size_in_pixels+3*sd_size_in_pixels|Size_in_pixels_0_nuclear < mean_size_in_pixels-3*sd_size_in_pixels) %>%
   select(Location_trackId) %>%
   distinct() %>%
   anti_join(clean_processed_data,., by = "Location_trackId") %>%
@@ -146,12 +242,13 @@ clean_data_small <- clean_data %>%
   filter(Location_trackId %in% clean_data_subset) %>%
   arrange(Location, frame)
 
+#rm(processing1, raw_data, raw_data_metadata, clean_processed_data)
+
 ```
  
 Nuclei motion of a subset of the  data.  
  
-```{r samplePlots, fig.width=12, fig.height=6}
-
+```{r samplePlots, fig.width=8, fig.height=6}
 
 p <- ggplot(clean_data_small, aes(x = Center_of_the_object_0, y = Center_of_the_object_1, colour = factor(trackId_nuclear))) + 
   geom_path(size=1.2) +
