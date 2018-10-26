@@ -1,0 +1,195 @@
+---
+title: "developing ilastik tracking of HeLa cells"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    df_print: paged
+---
+
+Exploration of segmentation, tracking and processing of HeLa cells using Fiji for registration and ilastik for pixel classification, segmentation, tracking and analysis.
+
+
+```{r "setup", include=FALSE}
+knitr::opts_chunk$set(fig.width=12, fig.height=8,
+                      echo=FALSE, warning=FALSE, message=FALSE,
+                      cache=TRUE)
+library(tidyverse)
+library(RColorBrewer)
+library(gplots)
+library(scales)
+library(EBImage)
+
+```
+
+```{r get_data, , cache.lazy = FALSE}
+
+#Setup colors
+spectralPal <- brewer.pal(11,"Spectral")[11:1]
+
+#Read in a CSV with ilastik tracking data
+data_path <- "/eppec/storage/groups/heiserlab/image_scratch/"
+nuclear_dir_name <- "TxRed_Reg"
+reporter_dir_name <- "GFP_Reg"
+barcode <- "HE_E_L_049_01_1"
+
+well_location_dirs <- dir(paste0(data_path, barcode), pattern = "[[:alnum:]]*_[[:digit:]]*", full.names = TRUE)[1]
+message("DEBUG limiter in place")
+
+#Get the nuclear data
+raw_data <- lapply(well_location_dirs, function(well_location_dir){
+  nuclear_data_filename <- dir(paste0(well_location_dir,"/",nuclear_dir_name),pattern = "CSV-Table", full.names = TRUE)
+  if(is_empty(nuclear_data_filename)) stop("No nuclear data found in ", well_location_dir)
+  nuclear_data <- read_csv(nuclear_data_filename) %>%
+    mutate(Location = str_remove(well_location_dir, ".*/"),
+           Well = str_remove(Location,"_.*"),
+           Location_trackId = str_c(Location, "_",trackId))
+  #Get the reporter data for the same image location
+  reporter_data_filename <- dir(paste0(well_location_dir,"/",reporter_dir_name),pattern = "CSV-Table", full.names = TRUE)
+  if(is_empty(reporter_data_filename)) stop("No reporter data found in ", well_location_dir)
+  reporter_data <- read_csv(reporter_data_filename)
+  all_data <- nuclear_data %>%
+    inner_join(reporter_data, by=c("frame", "Center_of_the_object_0", "Center_of_the_object_1"))
+  # missing_nuclear_data <- nuclear_data %>%
+  #   anti_join(all_data, by=c("frame", "Center_of_the_object_0", "Center_of_the_object_1"))
+  #   missing_reporter_data <- reporter_data %>%
+  #   anti_join(all_data, by=c("frame", "Center_of_the_object_0", "Center_of_the_object_1"))
+  colnames(all_data) <- str_replace_all(colnames(all_data), "[.]x","_nuclear")
+  colnames(all_data) <- str_replace_all(colnames(all_data), "[.]y","_reporter")
+return(all_data)
+}) %>%
+  bind_rows()
+
+#addmetadata
+raw_data_metadata <- read_csv(paste0(data_path,"/",barcode,"/Analysis/",barcode,"_exp_metadata.csv")) %>%
+  select(matches("Well|CellLine-1$|Drug|Ligand|Reporter|Image")) %>%
+  distinct() %>%
+  left_join(raw_data, by=c("Well"))
+
+colnames(raw_data_metadata)[str_detect(colnames(raw_data_metadata),"-")] <- str_replace_all(colnames(raw_data_metadata)[str_detect(colnames(raw_data_metadata),"-")], "-","_")
+raw_data_metadata <- mutate(raw_data_metadata, Time = frame*Image_period)
+
+
+processing1 <- raw_data_metadata %>%
+  filter(lineageId_nuclear > 1,
+         trackId_nuclear > 1) %>% #limit to valid tracks and lineages
+  group_by(Location_trackId) %>%
+  mutate(Track_length = n()) %>%
+  ungroup() %>% 
+  #remove dividing, disappearing and appearing cells
+  filter(Track_length==max(length(unique(frame)))) %>% 
+  group_by(Location_trackId) %>%
+  mutate(Mean_Intensity_0_nuclear_sum = sum(Mean_Intensity_0_nuclear),
+         Mean_Intensity_0_nuclear_T0 = Mean_Intensity_0_nuclear[frame==0],
+         Mean_Intensity_0_nuclear_T0norm = Mean_Intensity_0_nuclear/Mean_Intensity_0_nuclear_T0,
+         Mean_Intensity_0_nuclear_T0norm_sum = sum(Mean_Intensity_0_nuclear_T0norm)) %>%
+  mutate(Mean_Intensity_0_reporter_sum = sum(Mean_Intensity_0_reporter),
+         Mean_Intensity_0_reporter_T0 = Mean_Intensity_0_reporter[frame==0],
+         Mean_Intensity_0_reporter_T0norm = Mean_Intensity_0_reporter/Mean_Intensity_0_reporter_T0,
+         Mean_Intensity_0_reporter_T0norm_sum = sum(Mean_Intensity_0_reporter_T0norm),
+         Movement_0_nuclear = c(diff(Object_Center_0_nuclear),0),
+         Movement_1_nuclear = c(diff(Object_Center_1_nuclear),0),
+         Distance_01_nuclear = sqrt(Movement_0_nuclear^2 + Movement_1_nuclear^2),
+         facet_label = paste0(Well," " ,Ligand_1,": ", Ligand_1_conc," ", Ligand_1_concUnit)) %>%
+  ungroup()
+
+```
+
+
+
+
+```{r}
+
+clean_processed_data <- processing1 %>%
+  group_by(Well) %>%
+  select(Location_trackId, Mean_Intensity_0_reporter_T0norm_sum, Well) %>%
+  distinct() %>%
+  arrange(desc(Mean_Intensity_0_reporter_T0norm_sum)) %>%
+  group_by(Well) %>%
+  mutate(Mean_Intensity_0_reporter_T0norm_sum_rank = row_number()) %>%
+  ungroup() %>%
+  select(Location_trackId, Mean_Intensity_0_reporter_T0norm_sum_rank) %>%
+  left_join(processing1, by="Location_trackId")
+
+#Intensity filter
+#identify outliers based on size, motion and change in intensity
+mean_Mean_Intensity_0_reporter_T0norm = mean(processing1$Mean_Intensity_0_reporter_T0norm)
+sd_Mean_Intensity_0_reporter_T0norm = sd(processing1$Mean_Intensity_0_reporter_T0norm)
+mean_size_in_pixels = mean(processing1$Size_in_pixels_0_reporter)
+sd_size_in_pixels = sd(processing1$Size_in_pixels_0_reporter)
+max_nuclear_dis <- 100
+max_Size_in_pixels_0_nuclear <- 225
+
+#Calculate changes in intensity
+clean_data <- clean_processed_data %>%
+  group_by(Location_trackId) %>%
+  arrange(Time) %>%
+  mutate(Mean_Intensity_0_nuclear_T0norm_diff =  c(diff(Mean_Intensity_0_nuclear_T0norm),0),
+         Mean_Intensity_0_reporter_T0norm_diff =  c(diff(Mean_Intensity_0_reporter_T0norm),0)) %>%
+  filter(Mean_Intensity_0_reporter_T0norm > mean_Mean_Intensity_0_reporter_T0norm+3*sd_Mean_Intensity_0_reporter_T0norm|Mean_Intensity_0_reporter_T0norm <mean_Mean_Intensity_0_reporter_T0norm-3*sd_Mean_Intensity_0_reporter_T0norm|Distance_01_nuclear > max_nuclear_dis|Size_in_pixels_0_nuclear > mean_size_in_pixels+3*sd_size_in_pixels|Size_in_pixels_0_nuclear < mean_size_in_pixels-3*sd_size_in_pixels) %>%
+  select(Location_trackId) %>%
+  distinct() %>%
+  anti_join(clean_processed_data,., by = "Location_trackId") %>%
+  ungroup()
+
+  #Get cyto data processed by EBImage
+# cyto_data <- read_csv(paste0(beacon_dirs[1],"/Cyto_data.csv")) %>%
+#   group_by(trackId_nuclear) %>%
+#   mutate(Nuclei_b.mean_T0 = Nuclei_b.mean[frame==0],
+#          Nuclei_b.mean_T0norm = Nuclei_b.mean/Nuclei_b.mean_T0,
+#          Cyto_b.mean_T0 = Cyto_b.mean[frame==0],
+#          Cyto_b.mean_T0norm = Cyto_b.mean/Cyto_b.mean_T0,
+#          CytoNucleiRatio_b.mean = Nuclei_b.mean/Cyto_b.mean,
+#          CytoNucleiRatio_b.mean_T0 = CytoNucleiRatio_b.mean[frame==0],
+#          CytoNucleiRatio_b.mean_T0norm = CytoNucleiRatio_b.mean/CytoNucleiRatio_b.mean_T0) %>%
+#   ungroup()
+
+#Debug on a subset of the data
+set.seed(42)
+clean_data_subset <- sample(unique(clean_data$Location_trackId), size = .1*length(unique(clean_data$Location_trackId)), replace = FALSE)
+clean_data_small <- clean_data %>%
+  filter(Location_trackId %in% clean_data_subset) %>%
+  arrange(Location, frame)
+
+#rm(processing1, raw_data, raw_data_metadata, clean_processed_data)
+
+```
+
+```{r cellImages}
+#create a movie of a cell's GFP response over time
+#use EBImage and the bounding box value to select from the images
+location_trackId <- clean_data_small$Location_trackId[1]
+
+#Center the average size bounding box over every cell in every image
+#Get the dimensions of the average bounding box
+mean_bounding_box_dims <- clean_data_small %>%
+  mutate(bb_length_0_reporter = Bounding_Box_Maximum_0_reporter-Bounding_Box_Minimum_0_reporter,
+         bb_length_1_reporter = Bounding_Box_Maximum_1_reporter-Bounding_Box_Minimum_1_reporter) %>%
+  summarise(mean_bb_half_length_0_reporter = as.integer(.5*mean(bb_length_0_reporter)),
+            mean_bb_half_length_1_reporter = as.integer(.5*mean(bb_length_1_reporter))) %>%
+  unlist()
+
+clean_data_small <- clean_data_small %>%
+  mutate(bb_min_0_reporter = Center_of_the_object_0-mean_bounding_box_dims[1],
+         bb_max_0_reporter = Center_of_the_object_0+mean_bounding_box_dims[1],
+         bb_min_1_reporter = Center_of_the_object_1-mean_bounding_box_dims[2],
+         bb_max_1_reporter = Center_of_the_object_1+mean_bounding_box_dims[2])
+
+bounding_boxes <- clean_data_small %>%
+  filter(Location_trackId==location_trackId) %>%
+  select(matches("bb.*reporter"))
+
+#get images
+#TODO refactor to go through all cells in a dataset
+image_path <- paste0(data_path,barcode,"/",str_remove(location_trackId,"_[[:digit:]]*$"),"/",reporter_dir_name)
+image_filenames <- dir(image_path,full.names = TRUE,pattern = "tif")
+img <- readImage(image_filenames)
+GFP_bbs <- lapply(1:length(image_filenames), function(i){
+  img2 <- img[bounding_boxes$bb_min_0_reporter[i]:bounding_boxes$bb_max_0_reporter[i],bounding_boxes$bb_min_1_reporter[i]:bounding_boxes$bb_max_1_reporter[i],i]
+}) 
+GFP_bbs_movie <- combine(GFP_bbs)
+display(GFP_bbs_movie, method="browser")
+
+```
+
+
+
