@@ -17,6 +17,7 @@ library(tidyverse)
 library(RColorBrewer)
 library(gplots)
 library(scales)
+library(tiff)
 
 
 #Setup colors
@@ -337,7 +338,7 @@ p
 ```{r densityPlots, fig.height=12, fig.width=8}
 
 df <- clean_data %>%
-  filter(Time %in% c(3,30,60,90,120, 150, 177)) %>%
+  filter(Time %in% c(9,30,60,90,120, 150, 177)) %>%
   mutate(Mean_Intensity_0_reporter_T0norm = scales::squish(Mean_Intensity_0_reporter_T0norm, range = c(loProb, highProb)))
 
 p <- ggplot(df, aes(x = Mean_Intensity_0_reporter_T0norm, fill = factor(Ligand_1_conc))) +
@@ -383,6 +384,66 @@ p
 
 ```
 
+####Sample images.  
+
+```{r sampleImages, fig.height=12, fig.width=8}
+
+#Get images to be displayed
+#need to recreate path
+df <- clean_data %>%
+  filter(Time %in% c(9,30,60,90,120, 150, 177)) %>%
+  select(Well, frame, Location) %>%
+  distinct()
+
+wldf <- tibble(Well_Location_dir = well_location_dirs)%>%
+  mutate(Location = str_remove(Well_Location_dir,".*/")) %>%
+  right_join(df)
+
+foo <- paste0(wldf$Well_Location_dir[10],"/GFP_Reg/",wldf$Location[10],"_GFP_Scene1Interval",wldf$frame[10],".tif") %>% 
+  readTIFF()
+
+p <- ggplot(df, aes(x = Mean_Intensity_0_reporter_T0norm, fill = factor(Ligand_1_conc))) +
+  geom_density(alpha=.3) +
+  labs(x = "Intensity",
+       fill = "Ligand\nconcentration\nng/ml",
+       title = "Reporter intensity density plots") + 
+  theme_bw(base_size = ) + 
+  theme(axis.text.y=element_blank(),
+        axis.ticks.y=element_blank(),
+        panel.border = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.line = element_line(colour = "black"))+
+  facet_wrap(~Time, ncol=1, labeller = label_both)
+p
+
+p <- ggplot(df, aes(x = Mean_Intensity_0_reporter_T0norm, fill = factor(Ligand_1_conc))) +
+  geom_histogram(bins = 100, alpha=.5) +
+  labs(x = "Intensity",
+       fill = "Ligand\nconcentration\nng/ml",
+       title = "Reporter intensity histograms") + 
+  theme_bw(base_size = ) + 
+  theme(axis.text.y=element_blank(),
+        axis.ticks.y=element_blank(),
+        panel.border = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.line = element_line(colour = "black"))+
+  facet_wrap(~Time, ncol=1, labeller = label_both)
+p
+
+p <- ggplot(df, aes(x = factor(Ligand_1_conc), y = Mean_Intensity_0_reporter_T0norm, fill = factor(Ligand_1_conc))) +
+  geom_violin(alpha=.3) +
+  labs(x = "Ligand concentration (ng/ml)",
+       y = "Reporter intensity",
+       fill = "Ligand\nconcentration\nng/ml",
+       title = "Reporter intensity density plots") + 
+  theme_bw(base_size = ) + 
+  theme(panel.border = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.line = element_line(colour = "black"))+
+  facet_wrap(~Time, ncol=1, labeller = label_both)
+p
+
+```
 
 Mean nuclear intensity T0 normalized for a sampled set of cells that are present during the entire experiment.  
 
