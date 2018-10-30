@@ -91,10 +91,11 @@ raw_data_metadata <- read_csv(paste0(data_path,"/",barcode,"/Analysis/",barcode,
 colnames(raw_data_metadata)[str_detect(colnames(raw_data_metadata),"-")] <- str_replace_all(colnames(raw_data_metadata)[str_detect(colnames(raw_data_metadata),"-")], "-","_")
 raw_data_metadata <- mutate(raw_data_metadata, Time = frame*Image_period)
 
-
+first_valid_frame <- 2
 processing1 <- raw_data_metadata %>%
   filter(lineageId_nuclear > 1,
-         trackId_nuclear > 1) %>% #limit to valid tracks and lineages
+         trackId_nuclear > 1,
+         frame >= first_valid_frame) %>% #limit to valid tracks, lineages and microscope ready data 
   group_by(Location_trackId) %>%
   mutate(Track_length = n()) %>%
   ungroup() %>% 
@@ -102,19 +103,20 @@ processing1 <- raw_data_metadata %>%
   filter(Track_length==max(length(unique(frame)))) %>% 
   group_by(Location_trackId) %>%
   mutate(Mean_Intensity_0_nuclear_sum = sum(Mean_Intensity_0_nuclear),
-         Mean_Intensity_0_nuclear_T0 = Mean_Intensity_0_nuclear[frame==0],
+         Mean_Intensity_0_nuclear_T0 = Mean_Intensity_0_nuclear[frame==first_valid_frame],
          Mean_Intensity_0_nuclear_T0norm = Mean_Intensity_0_nuclear/Mean_Intensity_0_nuclear_T0,
          Mean_Intensity_0_nuclear_T0norm_sum = sum(Mean_Intensity_0_nuclear_T0norm)) %>%
   mutate(Mean_Intensity_0_reporter_sum = sum(Mean_Intensity_0_reporter),
-         Mean_Intensity_0_reporter_T0 = Mean_Intensity_0_reporter[frame==0],
+         Mean_Intensity_0_reporter_T0 = Mean_Intensity_0_reporter[frame==first_valid_frame],
          Mean_Intensity_0_reporter_T0norm = Mean_Intensity_0_reporter/Mean_Intensity_0_reporter_T0,
-         Mean_Intensity_0_raw_reporter_T0 = Mean_Intensity_0_raw_reporter[frame==0],
+         Mean_Intensity_0_raw_reporter_T0 = Mean_Intensity_0_raw_reporter[frame==first_valid_frame],
          Mean_Intensity_0_raw_reporter_T0norm = Mean_Intensity_0_raw_reporter/Mean_Intensity_0_raw_reporter_T0,
          Mean_Intensity_0_reporter_T0norm_sum = sum(Mean_Intensity_0_reporter_T0norm),
          Movement_0_nuclear = c(diff(Object_Center_0_nuclear),0),
          Movement_1_nuclear = c(diff(Object_Center_1_nuclear),0),
          Distance_01_nuclear = sqrt(Movement_0_nuclear^2 + Movement_1_nuclear^2),
-         facet_label = paste0(Well," " ,Ligand_1,": ", Ligand_1_conc," ", Ligand_1_concUnit)) %>%
+         facet_label = paste0(Ligand_1_conc," ", Ligand_1_concUnit," ",Ligand_1,": ", Well),
+         facet_label = factor(facet_label, levels = c("0 ng_per_ml NRG1: B3", "0.5 ng_per_ml NRG1: B2","1 ng_per_ml NRG1: B1", "2.5 ng_per_ml NRG1: A3", "5 ng_per_ml NRG1: A2" ,"10 ng_per_ml NRG1: A1"), ordered = TRUE)) %>%
   ungroup()
 
 ```
@@ -299,15 +301,14 @@ p
 ####Heatmaps of all data after outlier filtering.  
 
 
-```{r reporterheatmap, fig.width=6, fig.height=9, eval=TRUE}
+```{r reporterheatmap, fig.width=8, fig.height=5, eval=TRUE}
 #Heatmap with time columns and location)trackId rows, colour based on reporter intensity
 loProb <- quantile(clean_data$Mean_Intensity_0_reporter_T0norm, probs=.01)
 highProb <- quantile(clean_data$Mean_Intensity_0_reporter_T0norm, probs=.99)
 
 df <- clean_data %>%
   #filter(Well=="A1") %>%
-  mutate(Mean_Intensity_0_reporter_T0norm = scales::squish(Mean_Intensity_0_reporter_T0norm, range = c(loProb, highProb)),
-         facet_label = paste0(Well," " ,Ligand_1,": ", Ligand_1_conc," ", Ligand_1_concUnit))
+  mutate(Mean_Intensity_0_reporter_T0norm = scales::squish(Mean_Intensity_0_reporter_T0norm, range = c(loProb, highProb)))
   
 
 p <- ggplot(df, aes(x=Time, y = Mean_Intensity_0_reporter_T0norm_sum_rank,
@@ -323,13 +324,12 @@ p <- ggplot(df, aes(x=Time, y = Mean_Intensity_0_reporter_T0norm_sum_rank,
        fill = "Intensity",
        title = "Reporter intensity (T0 norm)") +
   theme_bw(base_size = ) + 
-  theme(axis.text.y=element_blank(),
-        axis.ticks.y=element_blank(),
-        panel.border = element_blank(),
+  theme(panel.border = element_blank(),
         panel.grid.major = element_blank(),
         panel.grid.minor = element_blank(),
-        axis.line = element_line(colour = "black"))+
-  facet_wrap(~facet_label)
+        axis.line = element_line(colour = "black"),
+        strip.text = element_text(size=rel(.5)))+
+  facet_wrap(~facet_label, nrow=1)
 p
 
 ```
@@ -339,7 +339,7 @@ p
 ```{r densityPlots, fig.height=12, fig.width=8}
 
 df <- clean_data %>%
-  filter(Time %in% c(9,30,60,90,120, 150, 177)) %>%
+  filter(Time %in% c((first_valid_frame+1)*unique(Image_period),30,60,90,120, 150, 177)) %>%
   mutate(Mean_Intensity_0_reporter_T0norm = scales::squish(Mean_Intensity_0_reporter_T0norm, range = c(loProb, highProb)))
 
 p <- ggplot(df, aes(x = Mean_Intensity_0_reporter_T0norm, fill = factor(Ligand_1_conc))) +
@@ -385,7 +385,7 @@ p
 
 ```
 
-####Sample images.  
+####Sample images arranged with time at the top of the y axis and increasing down while ligand concentration increases along the x axis.  
 
 ```{r sampleImages, fig.height=12, fig.width=12}
 
@@ -412,13 +412,16 @@ imgt <- tile(imgs,nx=length(unique(wldf$Ligand_1_conc)))
   
 #create a tile of images from one time point at each concentration
 p <- ggplot(df, aes(x = factor(Ligand_1_conc), y = Time)) +
+  geom_tile(colour="black")+
+  scale_y_reverse(breaks = c(9, 30,60,90,120, 150, 177)) +
   annotation_raster(imgt,  -Inf, Inf, -Inf, Inf) + 
-  labs(x = "Concentration",
-       title = "Reporter images") + 
-  theme_bw(base_size = ) + 
-  theme(panel.border = element_rect(colour = "orange"),
-        panel.grid.minor = element_blank(),
-        axis.line = element_line(colour = "black"))
+  labs(x = "Concentration (ng/ml",
+       y = "Minute",
+       title = "Reporter images over time") + 
+  theme(panel.ontop = FALSE,
+        axis.text = element_text(size=20),
+        axis.title = element_text(size=24),
+        text = element_text(size=28))
 p
 
 
