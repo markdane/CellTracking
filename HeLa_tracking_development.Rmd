@@ -76,8 +76,6 @@ raw_data <- lapply(well_location_dirs, function(well_location_dir){
   colnames(all_data) <- str_replace_all(colnames(all_data), "[.]x","_nuclear")
   colnames(all_data) <- str_replace_all(colnames(all_data), "[.]y","_reporter")
   
-
-  
 return(all_data)
 }) %>%
   bind_rows()
@@ -115,6 +113,9 @@ processing1 <- raw_data_metadata %>%
          Movement_0_nuclear = c(diff(Object_Center_0_nuclear),0),
          Movement_1_nuclear = c(diff(Object_Center_1_nuclear),0),
          Distance_01_nuclear = sqrt(Movement_0_nuclear^2 + Movement_1_nuclear^2),
+         Mean_Intensity_0_nuclear_T0norm_diff =  c(diff(Mean_Intensity_0_nuclear_T0norm),0),
+         Mean_Intensity_0_reporter_T0norm_diff = c(diff(Mean_Intensity_0_reporter_T0norm),0),
+         Size_in_pixels_0_nuclear_diff = c(diff(Size_in_pixels_0_nuclear),0),
          facet_label = paste0(Ligand_1_conc," ", Ligand_1_concUnit," ",Ligand_1,": ", Well),
          facet_label = factor(facet_label, levels = c("0 ng_per_ml NRG1: B3", "0.5 ng_per_ml NRG1: B2","1 ng_per_ml NRG1: B1", "2.5 ng_per_ml NRG1: A3", "5 ng_per_ml NRG1: A2" ,"10 ng_per_ml NRG1: A1"), ordered = TRUE)) %>%
   ungroup()
@@ -152,6 +153,8 @@ p
 #identify outliers based on size, motion and change in intensity
 mean_size_in_pixels = mean(processing1$Size_in_pixels_0_reporter)
 sd_size_in_pixels = sd(processing1$Size_in_pixels_0_reporter)
+mean_size_in_pixels_0_nuclear_diff = mean(processing1$Size_in_pixels_0_nuclear_diff)
+sd_size_in_pixels_0_nuclear_diff = sd(processing1$Size_in_pixels_0_nuclear_diff)
 
 p <- ggplot(processing1, aes(x = Size_in_pixels_0_reporter)) + 
   geom_histogram(binwidth = 1) +
@@ -163,9 +166,19 @@ p <- ggplot(processing1, aes(x = Size_in_pixels_0_reporter)) +
        x = "pixels")
 p
 
+p <- ggplot(processing1, aes(x = Well, y = Size_in_pixels_0_nuclear_diff)) + 
+  geom_violin() +
+   geom_hline(yintercept = mean_size_in_pixels_0_nuclear_diff+3*sd_size_in_pixels_0_nuclear_diff, colour="blue")+
+    geom_hline(yintercept = mean_size_in_pixels_0_nuclear_diff-3*sd_size_in_pixels_0_nuclear_diff, colour="blue")+
+    labs(title = "Change in size",
+       x = "pixels")
+p
+
 #identify outliers based on size, motion and change in intensity
 mean_Mean_Intensity_0_reporter_T0norm = mean(processing1$Mean_Intensity_0_reporter_T0norm)
 sd_Mean_Intensity_0_reporter_T0norm = sd(processing1$Mean_Intensity_0_reporter_T0norm)
+mean_Mean_Intensity_0_reporter_T0norm_diff = mean(processing1$Mean_Intensity_0_reporter_T0norm_diff)
+sd_Mean_Intensity_0_reporter_T0norm_diff = sd(processing1$Mean_Intensity_0_reporter_T0norm_diff)
 
 p <- ggplot(processing1, aes(x = Mean_Intensity_0_reporter_T0norm)) + 
   geom_histogram(binwidth = .02) +
@@ -177,15 +190,26 @@ p <- ggplot(processing1, aes(x = Mean_Intensity_0_reporter_T0norm)) +
        x = "intensity")
 p
 
-df <- processing1 %>%
-  filter(Distance_01_nuclear >=2)
-p <- ggplot(df, aes(x = Distance_01_nuclear)) + 
-  geom_histogram(binwidth = 1) +
-  geom_vline(xintercept = 10, color="blue")+
-  coord_cartesian(x = c(2,100))+
-  labs(title = "Distance moved between frames",
-       x = "pixels")
+p <- ggplot(processing1, aes(x = Mean_Intensity_0_reporter_T0norm_diff)) + 
+  geom_histogram(binwidth = .002) +
+  geom_vline(xintercept = mean_Mean_Intensity_0_reporter_T0norm_diff+3*sd_Mean_Intensity_0_reporter_T0norm_diff, colour="blue")+
+    geom_vline(xintercept = mean_Mean_Intensity_0_reporter_T0norm_diff-3*sd_Mean_Intensity_0_reporter_T0norm_diff, colour="blue")+
+  #coord_cartesian(x = c(0,2))+
+  labs(title = "Normalized reporter intensity differences between frames",
+       subtitle = "mean +/- 3sd shown in blue",
+       x = "intensity")
 p
+
+p <- ggplot(processing1, aes(x = Well, y = Mean_Intensity_0_reporter_T0norm_diff)) + 
+  geom_violin() +
+    geom_hline(yintercept = mean_Mean_Intensity_0_reporter_T0norm_diff+3*sd_Mean_Intensity_0_reporter_T0norm_diff, colour="blue")+
+    geom_hline(yintercept = mean_Mean_Intensity_0_reporter_T0norm_diff-3*sd_Mean_Intensity_0_reporter_T0norm_diff, colour="blue")+
+  labs(title = "Normalized reporter intensity differences",
+       subtitle = "mean +/- 3sd shown in blue",
+       x = "Well",
+       y = "T0 normalized intensity difference")
+p
+
 
 df <- processing1 %>%
   filter(Distance_01_nuclear >=10)
@@ -231,9 +255,7 @@ clean_processed_data <- processing1 %>%
 clean_data <- clean_processed_data %>%
   group_by(Location_trackId) %>%
   arrange(Time) %>%
-  mutate(Mean_Intensity_0_nuclear_T0norm_diff =  c(diff(Mean_Intensity_0_nuclear_T0norm),0),
-         Mean_Intensity_0_reporter_T0norm_diff =  c(diff(Mean_Intensity_0_reporter_T0norm),0)) %>%
-  filter(Mean_Intensity_0_reporter_T0norm > mean_Mean_Intensity_0_reporter_T0norm+3*sd_Mean_Intensity_0_reporter_T0norm|Mean_Intensity_0_reporter_T0norm <mean_Mean_Intensity_0_reporter_T0norm-3*sd_Mean_Intensity_0_reporter_T0norm|Distance_01_nuclear > max_nuclear_dis|Size_in_pixels_0_nuclear > mean_size_in_pixels+3*sd_size_in_pixels|Size_in_pixels_0_nuclear < mean_size_in_pixels-3*sd_size_in_pixels) %>%
+  filter(Mean_Intensity_0_reporter_T0norm > mean_Mean_Intensity_0_reporter_T0norm+3*sd_Mean_Intensity_0_reporter_T0norm|Mean_Intensity_0_reporter_T0norm <mean_Mean_Intensity_0_reporter_T0norm-3*sd_Mean_Intensity_0_reporter_T0norm|Mean_Intensity_0_reporter_T0norm_diff > mean_Mean_Intensity_0_reporter_T0norm_diff+3*sd_Mean_Intensity_0_reporter_T0norm_diff|Mean_Intensity_0_reporter_T0norm_diff <mean_Mean_Intensity_0_reporter_T0norm_diff-3*sd_Mean_Intensity_0_reporter_T0norm_diff|Distance_01_nuclear > max_nuclear_dis|Size_in_pixels_0_nuclear > mean_size_in_pixels+3*sd_size_in_pixels|Size_in_pixels_0_nuclear < mean_size_in_pixels-3*sd_size_in_pixels|Size_in_pixels_0_nuclear_diff>mean_size_in_pixels_0_nuclear_diff+3*sd_size_in_pixels_0_nuclear_diff|Size_in_pixels_0_nuclear_diff<mean_size_in_pixels_0_nuclear_diff-3*sd_size_in_pixels_0_nuclear_diff) %>%
   select(Location_trackId) %>%
   distinct() %>%
   anti_join(clean_processed_data,., by = "Location_trackId") %>%
