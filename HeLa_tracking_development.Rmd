@@ -52,7 +52,7 @@ raw_data <- lapply(well_location_dirs, function(well_location_dir){
   nuclear_data <- read_csv(nuclear_data_filename) %>%
     mutate(Location = str_remove(well_location_dir, ".*/"),
            Well = str_remove(Location,"_.*"),
-           Location_trackId = str_c(Location, trackId))
+           Location_trackId = str_c(Location,  "_", trackId))
   #Get the reporter data for the same image location
   reporter_data_filename <- dir(paste0(well_location_dir,"/",reporter_dir_name),pattern = "CSV-Table", full.names = TRUE)
   if(is_empty(reporter_data_filename)) stop("No reporter data found in ", well_location_dir)
@@ -648,6 +648,52 @@ p
        x = "Frame") 
 p <- p + geom_smooth(aes(x = frame,  y = CytoNucleiRatio_b.mean_T0norm), colour="black", method="loess")
 p
+
+
+```
+
+
+```{r cellImages, eval=FALSE}
+#create a movie of a cell's GFP response over time
+#use EBImage and the bounding box value to select from the images
+location_trackId <- clean_data_small$Location_trackId[1]
+
+#Center the average size bounding box over every cell in every image
+#Get the dimensions of the average bounding box
+mean_bounding_box_dims <- clean_data_small %>%
+  mutate(bb_length_0_reporter = Bounding_Box_Maximum_0_reporter-Bounding_Box_Minimum_0_reporter,
+         bb_length_1_reporter = Bounding_Box_Maximum_1_reporter-Bounding_Box_Minimum_1_reporter) %>%
+  summarise(mean_bb_half_length_0_reporter = as.integer(.5*mean(bb_length_0_reporter)),
+            mean_bb_half_length_1_reporter = as.integer(.5*mean(bb_length_1_reporter))) %>%
+  unlist()
+
+#Add columns that define bounding boxes around every cell in every image
+clean_data_small <- clean_data_small %>%
+  mutate(bb_min_0_reporter = Center_of_the_object_0-mean_bounding_box_dims[1],
+         bb_max_0_reporter = Center_of_the_object_0+mean_bounding_box_dims[1],
+         bb_min_1_reporter = Center_of_the_object_1-mean_bounding_box_dims[2],
+         bb_max_1_reporter = Center_of_the_object_1+mean_bounding_box_dims[2],
+         bb_min_0_reporter = pmax(0, bb_min_0_reporter),
+         bb_max_0_reporter = pmin(1280, bb_max_0_reporter),
+         bb_min_1_reporter = pmax(0, bb_min_1_reporter),
+         bb_max_1_reporter = pmin(960, bb_max_1_reporter))
+#loop through location trackIds to generate and store movies
+cell_movies <- lapply(unique(clean_data_small$Location_trackId)[c(100, 200, 500, 1000)], function (location_trackId){
+  bounding_boxes <- clean_data_small %>%
+    filter(Location_trackId==location_trackId) %>%
+    select(matches("bb.*reporter|frame|Time"))
+  
+  #get images
+  image_path <- paste0(data_path,barcode,"/",str_remove(location_trackId,"_[[:digit:]]*$"),"/",reporter_dir_name)
+  image_filenames <- dir(image_path,full.names = TRUE,pattern = "tif")[bounding_boxes$frame]
+  img <- readImage(image_filenames)
+  GFP_bbs <- lapply(1:nrow(bounding_boxes), function(i){
+    img2 <- img[bounding_boxes$bb_min_0_reporter[i]:bounding_boxes$bb_max_0_reporter[i],bounding_boxes$bb_min_1_reporter[i]:bounding_boxes$bb_max_1_reporter[i],i]
+  }) 
+  GFP_bbs_movie <- combine(GFP_bbs)
+  writeImage(GFP_bbs_movie, paste0(image_path,"/Cell_images_",location_trackId,".tif"))
+})
+
 
 
 ```
