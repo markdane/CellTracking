@@ -117,7 +117,7 @@ function registerStacks(dir_list) {
   }
 }
   
-  dir = "/eppec/storage/groups/heiserlab/image_scratch/LI_I_L_034_01_1/"; //uncomment for eppec
+  dir = "/eppec/storage/groups/heiserlab/image_scratch/LI_I_L_035_01_1/"; //uncomment for eppec
   //dir = "/Users/dane/Documents/CellTracking/IncuCyte/PL42/"; //uncomment for laptop
   print("Registering images in well_location directories of " + dir);
   dirs = getFileList(dir);
