@@ -46,10 +46,9 @@ max_Size_in_pixels_0_nuclear <- 22500
 max_Size_in_pixels_1_nuclear <- 22500
 
 
-well_location_dirs <- dir(paste0(data_path, barcode), pattern = "[[:alnum:]]*_[[:digit:]]*", full.names = TRUE)
-#message("DEBUG limiter in place")
+well_location_dirs <- dir(paste0(data_path, barcode), pattern = "[[:alnum:]]*_[[:digit:]]*", full.names = TRUE)[c(1,3,4)]
 #Get the nuclear data
-raw_data <- lapply(well_location_dirs[1], function(well_location_dir){
+raw_data <- lapply(well_location_dirs, function(well_location_dir){
   phase_data_filename <- dir(paste0(well_location_dir,"/",phase_dir_name),pattern = "CSV-Table", full.names = TRUE)
   if(is_empty(phase_data_filename)) stop("No phase data found in ", well_location_dir)
   all_data <- read_csv(phase_data_filename) %>%
@@ -277,7 +276,7 @@ Nuclei motion of a subset of the  data.
  
 ```{r samplePlots, fig.width=8, fig.height=6}
 
-p <- ggplot(clean_data_small, aes(x = Center_of_the_object_0, y = Center_of_the_object_1, colour = factor(trackId_nuclear))) + 
+p <- ggplot(clean_data_small, aes(x = Center_of_the_object_0_nuclear, y = Center_of_the_object_1_nuclear, colour = factor(trackId))) + 
   geom_path(size=1.2) +
   guides(colour=FALSE) +
   scale_y_reverse() +
@@ -292,8 +291,8 @@ Cell counts that include divsion, appearance and disappearance. Tracks labeled a
 ```{r cellCount, fig.width=8, fig.height=6}
 
 df <- raw_data_metadata %>%
-    filter(lineageId_nuclear > 1,
-         trackId_nuclear > 1) %>% #limit to valid tracks and lineages
+    filter(lineageId > 1,
+         trackId > 1) %>% #limit to valid tracks and lineages
   group_by(Location, Time) %>%
   summarise(Cell_count = n())
 
@@ -446,7 +445,7 @@ df <- clean_data %>%
   group_by(Well) %>%
   select(Location_trackId, Well) %>%
   distinct() %>%
-  sample_n(size = 12) %>%
+  #sample_n(size = 4) %>%
   inner_join(clean_data, by = c("Well", "Location_trackId"))
 
 p <- ggplot(clean_data, aes(x = Time, y = Mean_Intensity_0_nuclear, group = factor(Location_trackId))) +
@@ -456,7 +455,7 @@ p <- ggplot(clean_data, aes(x = Time, y = Mean_Intensity_0_nuclear, group = fact
        y = "Nuclear intensity",
        x = unique(raw_data_metadata$Image_period_timeUnit)) + 
   facet_wrap(~Ligand_1)
-p <- p + geom_line(data=df, aes(colour=factor(trackId_reporter)))
+p <- p + geom_line(data=df, aes(colour=factor(trackId)))
 p
 
 
@@ -470,7 +469,7 @@ df <- clean_data %>%
   group_by(Well) %>%
   select(Location_trackId, Well) %>%
   distinct() %>%
-  sample_n(size = 12) %>%
+  #sample_n(size = 4) %>%
   inner_join(clean_data, by = c("Well", "Location_trackId"))
 
 
@@ -481,7 +480,7 @@ p <- ggplot(clean_data, aes(x = Time, y = Mean_Intensity_1_nuclear, group = fact
        y = "Reporter intensity ",
        x = unique(raw_data_metadata$Image_period_timeUnit)) + 
   facet_wrap(~Ligand_1)
-p <- p + geom_line(data=df, aes(colour=factor(trackId_reporter)))
+p <- p + geom_line(data=df, aes(colour=factor(trackId)))
 p
 
 ```
@@ -493,7 +492,7 @@ df <- clean_data %>%
   filter(Well==unique(Well)[1]) %>%
   select(Location_trackId, Well) %>%
   distinct() %>%
-  sample_n(size = 12) %>%
+  #sample_n(size = 4) %>%
   inner_join(clean_data, by = c("Well", "Location_trackId")) 
 
 
@@ -503,7 +502,7 @@ p <- ggplot(df, aes(x = Time, y = Mean_Intensity_1_nuclear_T0norm, colour = (Loc
   labs(title = "Reporter intensity over time by well",
        y = "Reporter intensity (normalized to T0)",
        x = unique(raw_data_metadata$Image_period_timeUnit))
-p <- p + geom_line(aes(y = Mean_Intensity_0_raw_reporter_T0norm), linetype = 2)
+p <- p + geom_line(aes(y = Mean_Intensity_0_raw_nuclear_T0norm), linetype = 2)
 p
 
 foo <- df %>%
