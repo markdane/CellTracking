@@ -15,16 +15,16 @@ function registerStacks(dir_list) {
   for (i=0; i<dir_list.length; i++) {
       if(matches(dir_list[i], "[A-Z][1-9]_[1-9]/")) {
       	 //create subdirectories for the registered images
-        red_dir = dir + "/" + dir_list[i] + "R_Reg"+File.separator;
-        if (!File.exists(red_dir))
-        	File.makeDirectory(red_dir);
-        	if (!File.exists(red_dir))
-      			exit("Unable to create directory" + red_dir);
-       	GFP_dir = dir + dir_list[i] + "G_Reg"+File.separator;
-       	if (!File.exists(GFP_dir))
-        	File.makeDirectory(GFP_dir);
-  			if (!File.exists(GFP_dir))
-      			exit("Unable to create directory" + GFP_dir);
+        //red_dir = dir + "/" + dir_list[i] + "R_Reg"+File.separator;
+        //if (!File.exists(red_dir))
+        	//File.makeDirectory(red_dir);
+        	//if (!File.exists(red_dir))
+      			//exit("Unable to create directory" + red_dir);
+       	//GFP_dir = dir + dir_list[i] + "G_Reg"+File.separator;
+       	//if (!File.exists(GFP_dir))
+        	//File.makeDirectory(GFP_dir);
+  			//if (!File.exists(GFP_dir))
+      			//exit("Unable to create directory" + GFP_dir);
       	Phase_dir = dir + dir_list[i] + "P_Reg"+File.separator;
        	if (!File.exists(Phase_dir))
         	File.makeDirectory(Phase_dir);
@@ -67,7 +67,7 @@ function registerStacks(dir_list) {
 		rename("R_Reg");
 		run("8-bit");
 		//print("Saving registered R stack in well_location " +  dir + dir_list[i]);
-		run("Image Sequence... ", "format=TIFF save=" +  dir + dir_list[i] + "/R_Reg");
+		//run("Image Sequence... ", "format=TIFF save=" +  dir + dir_list[i] + "/R_Reg");
       	print("Opening unregistered G stack in well_location " +  dir + dir_list[i]);
       	run("Image Sequence...", "open=" + dir + dir_list[i] + "/G_Unreg starting=2 sort");
       	//remove slice where the image is blank due to plate removal
@@ -84,8 +84,8 @@ function registerStacks(dir_list) {
 		selectWindow("G_Unreg");
 		rename("G_Reg");
 		run("8-bit");
-		print("Saving registered G stack in well_location " +  dir + dir_list[i]);
-		run("Image Sequence... ", "format=TIFF save=" +  dir + "/" + dir_list[i] + "/G_Reg");
+		//print("Saving registered G stack in well_location " +  dir + dir_list[i]);
+		//run("Image Sequence... ", "format=TIFF save=" +  dir + "/" + dir_list[i] + "/G_Reg");
 		print("Opening unregistered P stack in well_location " +  dir + dir_list[i]);
 		run("Image Sequence...", "open=" + dir + "/" + dir_list[i] + "/P_Unreg starting=2 sort");
 		//remove slice where the image is blank due to plate removal
@@ -121,4 +121,5 @@ function registerStacks(dir_list) {
   //dir = "/Users/dane/Documents/CellTracking/IncuCyte/PL42/"; //uncomment for laptop
   print("Registering images in well_location directories of " + dir);
   dirs = getFileList(dir);
+  dirs = Array.slice(dirs,6,7);
   registerStacks(dirs);
