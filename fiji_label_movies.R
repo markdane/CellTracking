@@ -36,7 +36,7 @@ dms <- dir(plate_path, pattern = "[[:alnum:]]*_[[:digit:]]*") %>%
   left_join(md, by="Well")
 
 #loop through all well_locations
-foo <- lapply(seq_along(dms$Well_Location)[1:2], function(i){
+foo <- lapply(seq_along(dms$Well_Location), function(i){
    #run the imageJ macro to label images and wrote out AVI
     system(paste0("srun -c 1 ~/Fiji.app/ImageJ-linux64 --headless -macro /graylab/share/dane/CellTracking/label_movie.ijm ",
                   paste0('"',dms$Well_Location[i],"_",dms$Ligand.1[i],",",
