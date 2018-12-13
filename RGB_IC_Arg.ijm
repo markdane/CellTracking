@@ -43,7 +43,7 @@ function registerStacks(dir) {
 		print("Registering R stack in " +  dir);
 		run("MultiStackReg", "stack_1=R_Unreg_contrast "
 		+ "action_1=Align "
-      	+ "file_1=[Transformation.txt] "
+      	+ "file_1=[" + Output_dir + "Transformation.txt] "
       	+ "stack_2=None "
       	+ "action_2=Ignore file_2=[] "
       	+ "transformation=Translation save");
@@ -58,7 +58,7 @@ function registerStacks(dir) {
       	print("Registering G stack from " +  dir);
       	run("MultiStackReg", "stack_1=G_Unreg "
       	+ "action_1=[Load Transformation File]"
-      	+ "file_1=[Transformation.txt] "
+      	+ "file_1=[" + Output_dir + "Transformation.txt] "
       	+ "stack_2=None "
       	+ "action_2=Ignore "
       	+ "file_2=[] "
@@ -74,7 +74,7 @@ function registerStacks(dir) {
       	print("Registering P stack from " +  dir);
       	run("MultiStackReg", "stack_1=P_Unreg "
       	+ "action_1=[Load Transformation File]"
-      	+ "file_1=[Transformation.txt] "
+      	+ "file_1=[" + Output_dir + "Transformation.txt] "
       	+ "stack_2=None "
       	+ "action_2=Ignore "
       	+ "file_2=[] "
