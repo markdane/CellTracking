@@ -18,7 +18,7 @@ res <- lapply(dirs, function(dir_path){
   well_location <- str_remove(dir_path,".*/")
 # Create pixel probability masks based on the high-contrast nuclear images and
 # store them in the P_Reg directories
-system(paste0('srun -c 4 /home/users/dane/ilastik-1.3.2b3-Linux/run_ilastik.sh --headless --readonly=True --project=/graylab/share/dane/CellTracking/HDF5_pixels.ilp --raw_data=',dir_path,'/Composite_reg.tif --output_format="hdf5" --output_filename_format=',dir_path,'/Probabilities.h5'),
+system(paste0('srun -c 4 /home/users/dane/ilastik-1.3.2b3-Linux/run_ilastik.sh --headless --readonly=True --project=/graylab/share/dane/CellTracking/HDF5_pixels.ilp --raw_data=',dir_path,'/Analysis/Composite_reg.tif --output_format="hdf5" --output_filename_format=',dir_path,'/Analysis/Probabilities.h5'),
        wait=FALSE)
 })
 
