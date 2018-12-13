@@ -8,16 +8,17 @@ library(stringr)
 #that have a P_Reg subdirectories
 #
 
-pwd <- getwd()
-dirs <- paste0(pwd,"/",dir(pattern = "[[:alnum:]]*_[[:digit:]]*"))
-#dir_path = "A3_1"
-# 
+#use command line arguments to identify the plate ID
+plate_path = commandArgs(trailingOnly=TRUE)
+plate_path <- "/eppec/storage/groups/heiserlab/image_scratch/LI_I_L_035_01_1"
+dirs <- dir(path = plate_path, pattern = "[[:alnum:]]*_[[:digit:]]*",full.names = TRUE)
+
 res <- lapply(dirs, function(dir_path){
-  message("classifying pixels in nuclear images in: ",dir_path)
+  message("classifying pixels in: ",dir_path)
   well_location <- str_remove(dir_path,".*/")
 # Create pixel probability masks based on the high-contrast nuclear images and
 # store them in the P_Reg directories
-system(paste0('srun -c 8 /home/users/dane/ilastik-1.3.2b3-Linux/run_ilastik.sh --headless --readonly=True --project=/graylab/share/dane/CellTracking/HDF5_pixels.ilp --raw_data=',dir_path,'/P_Reg/Composite_reg.tif --output_format="hdf5" --output_filename_format=',dir_path,'/Probabilities.h5'),
+system(paste0('srun -c 4 /home/users/dane/ilastik-1.3.2b3-Linux/run_ilastik.sh --headless --readonly=True --project=/graylab/share/dane/CellTracking/HDF5_pixels.ilp --raw_data=',dir_path,'/P_Reg/Composite_reg.tif --output_format="hdf5" --output_filename_format=',dir_path,'/Probabilities.h5'),
        wait=FALSE)
 })
 
