@@ -13,11 +13,11 @@ function safeSliceDelete(bad_image) {
 
 function registerStacks(dir) {	
       	 //create subdirectory for the registered images
-      	Phase_dir = dir + "/P_Reg"+File.separator;
-       	if (!File.exists(Phase_dir))
-        	File.makeDirectory(Phase_dir);
-  			if (!File.exists(Phase_dir))
-      			exit("Unable to create directory" + Phase_dir);
+      	Output_dir = dir + "/Analysis"+File.separator;
+       	if (!File.exists(Output_dir))
+        	File.makeDirectory(Output_dir);
+  			if (!File.exists(Output_dir))
+      			exit("Unable to create directory" + Output_dir);
       	print("Opening unregistered R stack in " +  dir);
       	run("Image Sequence...", "open=" + dir + "/R_Unreg starting=2 sort");
       	//remove slice where the image is blank due to plate removal
