@@ -18,13 +18,11 @@ if (is("Batch Mode")) {
 
 //create subdirectory for the registered images
 Output_dir = well_location_path + "/Analysis"+File.separator;
-if (!File.exists(Output_dir))
-  File.makeDirectory(Output_dir);
-if (!File.exists(Output_dir))
-  exit("Unable to read or create directory" + Output_dir);
+if (!File.exists(Output_dir)) File.makeDirectory(Output_dir);
+if (!File.exists(Output_dir)) exit("Unable to read or create directory" + Output_dir);
       			
 print("Opening stack in " +  well_location_path + "/P_Unreg");
-run("Image Sequence...", "open=" + +  well_location_path + "/P_Unreg" + " file=(tif) sort");
+run("Image Sequence...", "open=" + well_location_path + "/P_Unreg" + " file=(tif) sort");
 setForegroundColor(255, 255, 255);
 setBackgroundColor(10, 10, 10);
 run("Label...", "format=Text starting=0 interval=1 x=1150 y=1000 font=18 text=[" + ligand1 + "]");
