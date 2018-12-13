@@ -87,7 +87,7 @@ function registerStacks(dir) {
        	selectWindow("Composite");
 		run("Re-order Hyperstack ...", "channels=[Channels (c)] slices=[Frames (t)] frames=[Slices (z)]");
 		print("Saving merged RGB for " +  dir);
-		saveAs("Tiff",  dir + "/Composite_reg.tif");
+		saveAs("Tiff",  dir + "/Analysis/Composite_reg.tif");
   		while (nImages>0) {
   			selectImage(nImages);
   			close();
