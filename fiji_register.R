@@ -11,13 +11,7 @@ plate_path = commandArgs(trailingOnly=TRUE)
 #plate_path <- "/eppec/storage/groups/heiserlab/image_scratch/LI_I_L_035_01_1"
 dirs <- dir(path = plate_path, pattern = "[[:alnum:]]*_[[:digit:]]*",full.names = TRUE)
 
-#Call this script from eppec in a plate directory with well_location subdirectories
-
-pwd <- getwd()
-dirs <- paste0(pwd,"/",dir(pattern = "[[:alnum:]]*_[[:digit:]]*"))
-#dir_path = "A3_1"
-
-res <- lapply(dirs[89:90], function(dir_path){
+res <- lapply(dirs, function(dir_path){
   message("registering images in ",dir_path)
 # Call a fiji macro on each well_location directory
 # store composite image results in the P_Reg directories
