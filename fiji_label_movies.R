@@ -6,7 +6,6 @@ library(tidyverse)
 #use command line arguments to identify the plate ID
 plate_path = commandArgs(trailingOnly=TRUE)
 #plate_path <- "/eppec/storage/groups/heiserlab/image_scratch/LI_I_L_035_01_1"
-dirs <- dir(path = plate_path, pattern = "[[:alnum:]]*_[[:digit:]]*",full.names = TRUE)
 plateID <- str_remove(plate_path,".*/")
 message("processing metadata for ",plateID)
 
@@ -37,9 +36,7 @@ dms <- dir(plate_path, pattern = "[[:alnum:]]*_[[:digit:]]*") %>%
   left_join(md, by="Well")
 
 #loop through all well_locations
-foo <- lapply(seq_along(dms$Well_Location), function(i){
-  subdirs <- dir(paste0(plate_path,"/",dms$Well_Location[i]))
-  lapply(subdirs[3], function(subdir){
+foo <- lapply(seq_along(dms$Well_Location)[1:2], function(i){
    #run the imageJ macro to label images and wrote out AVI
     system(paste0("srun -c 1 ~/Fiji.app/ImageJ-linux64 --headless -macro /graylab/share/dane/CellTracking/label_movie.ijm ",
                   paste0('"',dms$Well_Location[i],"_",dms$Ligand.1[i],",",
@@ -47,6 +44,5 @@ foo <- lapply(seq_along(dms$Well_Location), function(i){
                          dms$Ligand.1[i],",",
                          dms$Ligand.2[i],",",
                          paste(dms$Drug.1[i],dms$Drug.1.conc[i],dms$Drug.1.concUnit[i],'"'))), wait = FALSE)
-  })
 })
 
