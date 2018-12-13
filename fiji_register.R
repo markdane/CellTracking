@@ -16,6 +16,6 @@ res <- lapply(dirs, function(dir_path){
 # Call a fiji macro on each well_location directory
 # store composite image results in the P_Reg directories
   system(paste0('srun -c 2 ~/Fiji.app/ImageJ-linux64 --headless -macro /graylab/share/dane/CellTracking/RGB_IC_Arg.ijm ',dir_path),
-         wait=FALSE)
+         wait=TRUE)
 })
 
