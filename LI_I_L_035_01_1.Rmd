@@ -46,15 +46,16 @@ max_Size_in_pixels_0_nuclear <- 22500
 max_Size_in_pixels_1_nuclear <- 22500
 
 
-well_location_dirs <- dir(paste0(data_path, barcode), pattern = "[[:alnum:]]*_[[:digit:]]*", full.names = TRUE)[c(1,3,4)]
+well_location_dirs <- dir(paste0(data_path, barcode), pattern = "[[:alnum:]]*_[[:digit:]]*", full.names = TRUE)[c(1,3:24)]
 #Get the nuclear data
 raw_data <- lapply(well_location_dirs, function(well_location_dir){
-  phase_data_filename <- dir(paste0(well_location_dir,"/",phase_dir_name),pattern = "CSV-Table", full.names = TRUE)
-  if(is_empty(phase_data_filename)) stop("No phase data found in ", well_location_dir)
+  phase_data_filename <- dir(paste0(well_location_dir,"/Analysis"),pattern = "CSV-Table", full.names = TRUE)
+  if(is_empty(phase_data_filename)) stop("No text data found in ", well_location_dir)
   all_data <- read_csv(phase_data_filename) %>%
-    mutate(Location = str_remove(well_location_dir, ".*/"),
-           Well = str_remove(Location,"_.*"),
-           Location_trackId = str_c(Location,  "_", trackId))
+    mutate(Well_location = str_remove(well_location_dir, ".*/"),
+           Well = str_remove(Well_location,"_.*"),
+           Location = str_remove(Well_location, ".*_"),
+           Location_trackId = str_c(Well_location,  "_", trackId))
   # #Get the reporter data for the same image location
   # reporter_data_filename <- dir(paste0(well_location_dir,"/",reporter_dir_name),pattern = "CSV-Table", full.names = TRUE)
   # if(is_empty(reporter_data_filename)) stop("No reporter data found in ", well_location_dir)
@@ -146,30 +147,56 @@ df %>%
 ```
 
 
-```{r exploreIDvalues}
-
-p <- ggplot(pr_data_metadata, aes(x=Time, y=trackId, group=trackId)) +
-  geom_line(alpha = .5)
-p
-
-p <- ggplot(pr_data_metadata, aes(x=Time, y=lineageId, group=trackId)) +
-  geom_line(alpha = .5)
-p
-
-
-p <- ggplot(pr_data_metadata, aes(x=Time, y=lineageId, colour=trackId)) +
-  geom_point(alpha = .5) +
-  geom_jitter(height = .4, width=0)
-p
-```
 ```{r countCells}
 df <- pr_data_metadata %>%
-  group_by(Time, Location) %>%
+  group_by(Time, Well, Location) %>%
   count()
 
 p <- ggplot(df, aes(x = Time, y = n)) +
   geom_path() +
-  facet_grid(~Location)
+  facet_grid(Well~Location)
 p
+
+```
+
+```{r exploreIDvalues}
+#limit to one image sequence
+wl <- "A1_4"
+df <- pr_data_metadata %>%
+  filter(Well_location == wl) 
+
+p <- ggplot(df, aes(x=Time, y=trackId, group=trackId)) +
+  geom_line(alpha = .5)
+p
+
+p <- ggplot(df, aes(x=Time, y=lineageId, group=trackId)) +
+  geom_line(alpha = .5)
+p
+
+
+p <- ggplot(df, aes(x=Time, y=lineageId, colour=trackId)) +
+  geom_point(alpha = .5) +
+  geom_jitter(height = .4, width=0)
+p
+
+df_small <- pr_data_metadata %>%
+  filter(Well_location == wl,
+         lineageId %in% 13) 
+
+p <- ggplot(df_small, aes(x=Time, y=trackId, group=trackId)) +
+  geom_line(alpha = .5)
+p
+
+p <- ggplot(df_small, aes(x=Time, y=lineageId, group=trackId)) +
+  geom_line(alpha = .5)
+p
+
+
+p <- ggplot(df_small, aes(x=Time, y=lineageId, colour=trackId)) +
+  geom_point(alpha = .5) +
+    geom_jitter(height = .4, width=0)
+
+p
+
 
 ```
