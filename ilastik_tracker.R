@@ -6,15 +6,14 @@ library(stringr)
 #Output are csv files in each well_location
 #Call this script from eppec with a plate path command line argument
 
-plate_path = commandArgs(trailingOnly=TRUE)
-#plate_path <- "/eppec/storage/groups/heiserlab/image_scratch/LI_I_L_035_01_1"
-dirs <- dir(path = plate_path, pattern = "[[:alnum:]]*_[[:digit:]]*",full.names = TRUE)
-
+# plate_path = commandArgs(trailingOnly=TRUE)
+plate_path <- "/eppec/storage/groups/heiserlab/image_scratch/AU_I_L_008_01_1"
+#dirs <- dir(path = plate_path, pattern = "[[:alnum:]]*_[[:digit:]]*",full.names = TRUE)[c(17:19)]
+dirs <- dir(path = plate_path, pattern = "A1_2",full.names = TRUE)
 res <- lapply(dirs, function(dir_path){
   message("tracking cells in: ",dir_path)
-  well_location <- str_remove(dir_path,".*/")
 # Create csv files baed on nuclei probability masks
-  system(paste0('srun -c 4 /home/users/dane/ilastik-1.3.2b3-Linux/run_ilastik.sh --headless --readonly=True --project=/graylab/share/dane/CellTracking/RGB_Tracking.ilp --raw_data="',dir_path,'/Analysis/Composite_reg.tif" --prediction_maps=',dir_path,'/Analysis/Probabilities.h5 --export_source="Plugin" --export_plugin="CSV-Table"'),
+  system(paste0('srun -c 8  --exclude=eppec-node6,eppec-node7 /home/users/dane/ilastik-1.3.2b3-Linux/run_ilastik.sh --headless --readonly=True --project=/graylab/share/dane/CellTracking/Tracking_AU00801_v3.ilp --raw_data=',dir_path,'/Analysis/Composite_reg.tif --prediction_maps=',dir_path,'/Analysis/Composite_reg_probs.h5 --export_source="Plugin" --export_plugin="CSV-Table"'),
          wait=FALSE)
 })
 
