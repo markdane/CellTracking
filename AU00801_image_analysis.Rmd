@@ -21,6 +21,9 @@ library(RColorBrewer)
 library(gplots)
 library(scales)
 library(ggridges)
+library(gganimate)
+library(mclust)
+library(mixtools)
 
 
 #Setup colors
@@ -69,17 +72,26 @@ raw_data_metadata <- read_csv(paste0(data_path,"/",barcode,"/Analysis/",barcode,
   select(matches("Well|CellLine-1$|Drug|Ligand|Reporter|Image")) %>%
   distinct() %>%
   left_join(raw_data, by=c("Well"))
-
+  
 colnames(raw_data_metadata)[str_detect(colnames(raw_data_metadata),"-")] <- str_replace_all(colnames(raw_data_metadata)[str_detect(colnames(raw_data_metadata),"-")], "-","_")
 raw_data_metadata <- mutate(raw_data_metadata, Time = frame*Image_period)
 
-pd<- raw_data_metadata %>%
-  filter(lineageId > 1,
-         trackId > 1) %>% #limit to valid tracks and lineages
+raw_data_metadata <- raw_data_metadata %>%
+  select(Drug_1, Drug_1_conc) %>%
+  distinct() %>%
+  group_by(Drug_1) %>%
+  arrange(Drug_1_conc) %>%
+  mutate(Drug_1_conc_rank = rank(Drug_1_conc)) %>%
+  ungroup() %>%
+  right_join(raw_data_metadata) %>%
   group_by(Location_trackId) %>%
   mutate(Track_length = n(),
          Field = str_remove(Location, ".*_")) %>%
-  ungroup() %>% 
+  ungroup()
+  
+pd<- raw_data_metadata %>%
+  filter(lineageId > 1,
+         trackId > 1) %>% #limit to valid tracks and lineages
   group_by(Location_trackId) %>%
   mutate(Mean_Intensity_0_sum = sum(Mean_Intensity_0),
          Mean_Intensity_1_sum = sum(Mean_Intensity_1),
@@ -93,77 +105,122 @@ pd<- raw_data_metadata %>%
 
 Cell counts include divsion, appearance and disappearance. Tracks labeled as invalid in ilastik are removed.  
 
-```{r cellCount, fig.width=8, fig.height=6}
+```{r cellCount, fig.width=12, fig.height=4}
 
-df <- pd %>%
-  group_by(Location, Time, Well, Field, Drug_1, Drug_1_conc) %>%
+df <- raw_data_metadata %>%
+  group_by(Location, Time, Well, Field, Drug_1, Drug_1_conc, Drug_1_conc_rank) %>%
   summarise(Cell_count = n()) %>%
   ungroup() %>%
   group_by(Location, Well, Field) %>%
-  mutate(Cell_count_T0norm = Cell_count/Cell_count[Time == 0]) %>%
+  mutate(Cell_count_T0norm = Cell_count/Cell_count[Time == 0],
+         Row = str_remove(Well,"[[:digit:]]"),
+         Column = str_remove(Well,"[[:alpha:]]")) %>%
     ungroup()
 
-p <- ggplot(df, aes(x = Time, y = Cell_count)) +
-  geom_line(alpha=.3, size=.8) +
+p <- ggplot(df, aes(x = Time, y = Cell_count, colour = Drug_1)) +
+  geom_line() +
   #coord_cartesian(ylim=c(2000,2300)) +
   guides(colour=FALSE) +
-  labs(title = "Cell count over time",
+  labs(title = "Cell count over time, all tracks",
        y = "Cell Count",
        x = unique(raw_data_metadata$Image_period_timeUnit)) +
-    facet_grid(Well~Field)
+    facet_grid(Row~Column+Field, labeller = label_both)
 p
 
-p <- ggplot(df, aes(x = Time, y = Cell_count_T0norm)) +
-  geom_line(alpha=.3, size=.8) +
+p <- ggplot(df, aes(x = Time, y = Cell_count_T0norm, colour = Drug_1)) +
+  geom_line() +
   #coord_cartesian(ylim=c(2000,2300)) +
   guides(colour=FALSE) +
-  labs(title = "Cell count over time",
+  labs(title = "Cell count over time, all tracks",
        y = "Cell Count",
        x = unique(raw_data_metadata$Image_period_timeUnit)) +
-    facet_grid(Well~Field)
+    facet_grid(Row~Column+Field, labeller = label_both)
 p
 
-p <- ggplot(df, aes(x = Time, y = Cell_count, colour = Field)) +
-  geom_point(alpha=.1, size=.5) +
+df <- pd %>%
+  group_by(Location, Time, Well, Field, Drug_1, Drug_1_conc, Drug_1_conc_rank) %>%
+  summarise(Cell_count = n()) %>%
+  ungroup() %>%
+  group_by(Location, Well, Field) %>%
+  mutate(Cell_count_T0norm = Cell_count/median(Cell_count[Time %in% c(0, 30, 60, 90)]),
+         Row = str_remove(Well,"[[:digit:]]"),
+         Column = str_remove(Well,"[[:alpha:]]")) %>%
+    ungroup()
+
+
+p <- ggplot(df, aes(x = Time, y = Cell_count_T0norm, colour = Drug_1)) +
+  geom_line() +
   #coord_cartesian(ylim=c(2000,2300)) +
   guides(colour=FALSE) +
   labs(title = "Cell count over time",
        y = "Cell Count",
        x = unique(raw_data_metadata$Image_period_timeUnit)) +
-    facet_grid(Drug_1~Drug_1_conc)
+    facet_grid(Row~Column+Field, labeller = label_both)
 p
+
+```
+
+```{r}
+
 
 p <- ggplot(df, aes(x = Time, y = Cell_count_T0norm, colour = Field)) +
   geom_point(alpha=.1, size=.5) +
   #coord_cartesian(ylim=c(2000,2300)) +
-  guides(colour=FALSE) +
   labs(title = "Cell count over time",
        y = "Cell Count",
        x = unique(raw_data_metadata$Image_period_timeUnit)) +
-    facet_grid(Drug_1~Drug_1_conc)
+    facet_grid(Drug_1~Drug_1_conc_rank, scales = "free_y", labeller = label_both)
 p
 
 #Calculate and display drug responses
 dr_df <- df %>%
-  filter(Time %in% c(720, 1440, 2160, 2880)) %>%
-  group_by(Well, Time) %>%
+  filter(Time %in% c(720, 1440, 2160, 2880),
+         !Drug_1== "vehicle") %>%
+  group_by(Well, Time, Field) %>%
   mutate(Cell_count_T0norm_median = median(Cell_count_T0norm, na.rm = TRUE),
          Cell_count_T0norm_sd = sd(Cell_count_T0norm, na.rm = TRUE)) %>%
   ungroup()
 
-p <- ggplot(dr_df, aes(x = Drug_1_conc, y = Cell_count_T0norm, colour = Drug_1)) +
+p <- ggplot(dr_df, aes(x = Drug_1_conc_rank, y = Cell_count_T0norm, colour = Drug_1)) +
   #geom_boxplot(fill = "transparent",outlier.shape = NA) +
-  geom_point(colour = "black") +
+  geom_point() +
   geom_errorbar(aes(ymin = Cell_count_T0norm_median-Cell_count_T0norm_sd,
-                    ymax = Cell_count_T0norm_median + Cell_count_T0norm_sd))+
-  geom_smooth(se = FALSE) +
-  #coord_cartesian(ylim=c(2000,2300)) +
-  guides(colour=FALSE) +
+                    ymax = Cell_count_T0norm_median + Cell_count_T0norm_sd), alpha = .5, width = .1)+
+  geom_smooth(se = FALSE, span = .99) +
+  coord_cartesian(ylim=c(0,2)) +
   labs(title = "Dose responses",
        y = "Cell Count",
        x = "Drug concentration (nM)",
        colour = "Drug") +
   facet_wrap(~as.factor(Time))
+p
+
+p <- ggplot(dr_df, aes(x = Time, y = Cell_count_T0norm, colour = Drug_1)) +
+  #geom_boxplot(fill = "transparent",outlier.shape = NA) +
+  geom_point() +
+  geom_errorbar(aes(ymin = Cell_count_T0norm_median-Cell_count_T0norm_sd,
+                    ymax = Cell_count_T0norm_median + Cell_count_T0norm_sd), alpha = .5, width = .1)+
+  geom_smooth(se = FALSE, span = .99) +
+  coord_cartesian(ylim=c(0,2)) +
+  labs(title = "Dose responses",
+       y = "Cell Count",
+       x = "Time",
+       colour = "Drug") +
+  facet_wrap(~as.factor(Drug_1_conc_rank))
+p
+
+p <- ggplot(dr_df, aes(x = Time, y = Cell_count_T0norm, colour = factor(Drug_1_conc_rank))) +
+  #geom_boxplot(fill = "transparent",outlier.shape = NA) +
+  geom_point() +
+  # geom_errorbar(aes(ymin = Cell_count_T0norm_median-Cell_count_T0norm_sd,
+  #                   ymax = Cell_count_T0norm_median + Cell_count_T0norm_sd), alpha = .5, width = .1)+
+  geom_smooth(se = FALSE, span = .99) +
+  coord_cartesian(ylim=c(0,2)) +
+  labs(title = "Dose responses",
+       y = "Cell Count",
+       x = "Time",
+       colour = "Drug\nrank") +
+  facet_wrap(~as.factor(Drug_1))
 p
 
 ```
@@ -198,6 +255,9 @@ cd <- pd %>%
   summarise(Max_dist = max(Distance_01)) %>%
   filter(Max_dist < max_dis) %>%
   left_join(pd) %>%
+  ungroup() %>%
+  group_by(Location_trackId) %>%
+  mutate(Mean_Intensity_0_medNorm = Mean_Intensity_0/median(Mean_Intensity_0, na.rm = TRUE)) %>%
   ungroup()
 
 p <- ggplot(cd, aes(x = Mean_Intensity_0)) +
@@ -216,7 +276,18 @@ p
 
 ```
 
+
 There are `r length(unique(pd$Location_trackId))` cells tracked in the `r length(unique(pd$Location))` movies in the raw data. There are `r length(unique(cd$Location_trackId))`  tracks with all movements less than `r max_dis` pixels every `r unique(cd$Image_period)`  `r unique(cd$Image_period_timeunit)`s. 
+
+```{r mixmodel}
+#fit a gaussian mixture model to the movements
+
+mixmodel <- normalmixEM(log10(maxMove$Max_dist+.1))
+plot(mixmodel, which = 2)
+lines(density(log10(maxMove$Max_dist+.1)), lty=2, lwd=2)
+summary(mixmodel)
+```
+
 
 ```{r}
 
@@ -279,6 +350,26 @@ p
 
 ```
 
+```{r animate_A5_1, fig.width = 9, fig.width = 13}
+df <- pd %>%
+  filter(Location == "A5_1")
+
+ggplot(df, aes(x = Center_of_the_object_0, y = Center_of_the_object_1, size = Size_in_pixels_0, colour = log2(Mean_Intensity_1))) +
+  geom_point(alpha = 0.7) +
+  #scale_size(range = c(2, 12)) +
+  scale_y_reverse() +
+  #facet_wrap(~continent) +
+  # Here comes the gganimate specific bits
+  labs(title = 'Hour: {frame_time}',
+       x = 'X',
+       y = 'Y',
+       size = "Nuclear\npixels",
+       colour = "Reporter\nintensity") +
+  transition_time(Time) +
+  ease_aes('linear')
+```
+
+
 ####Lineage tracks
 
 ```{r fig.width=4, fig.height=5}
@@ -307,7 +398,7 @@ birthOrder <- function(parents, siblings){
     return(birthIndex)
 }
 
-df <- cd %>%
+df <- pd %>%
  #filter(Location == "A5_1") %>%
   select(Location, lineageId, trackId, Time, labelimageId, parentTrackId, mergerLabelId, Well, Field, Mean_Intensity_1, Drug_1, Drug_1_conc) %>%
   group_by(Location, lineageId, trackId) %>%
@@ -329,12 +420,13 @@ for(well_frame in unique(df$Location)) {
    left_join(df)
    
    p <- ggplot(dfm, aes(x = Time/60, y = factor(Generation), colour = as.factor(lineageId))) +
-  geom_path(size = .3) +
+  geom_path(size = 2) +
  # facet_grid(Well~Field, scales = "free_y") +
   labs(x = "Hours",
        y = NULL,
        title = well_frame,
         colour = "Lineage")
+   print(p)
 }
 
 for(well_frame in unique(df$Location)) {
@@ -351,7 +443,7 @@ for(well_frame in unique(df$Location)) {
    ungroup()
    mid <- 0
  p <- ggplot(dfm, aes(x = Time/60, y = factor(Generation), colour = log10(CellCycleReporter))) +
-   geom_path(size = 4) +
+   geom_path(size = 3) +
    scale_color_gradient2(midpoint=mid, low="blue", mid="white",
                          high="red", space ="Lab" )+
    labs(x = "Hours",
@@ -361,155 +453,30 @@ for(well_frame in unique(df$Location)) {
  print(p)
 }
 
-```
-
-####Reporter intensity density plots.  
-
-```{r densityPlots, fig.height=12, fig.width=8, eval = FALSE}
-loprob <- .002
-highProb <- .995
-df <- cd %>%
-  filter(Time %in% c(3,30,60,90,120, 150, 177)) %>%
-  mutate(Mean_Intensity_0 = scales::squish(Mean_Intensity_0, range = c(loProb, highProb)))
-
-p <- ggplot(df, aes(x = Mean_Intensity_0, fill = factor(Drug_1_conc))) +
-  geom_density(alpha=.3) +
-  labs(x = "Intensity",
-       fill = "Ligand\nconcentration\nng/ml",
-       title = "Reporter intensity density plots") + 
-  theme_bw(base_size = ) + 
-  theme(axis.text.y=element_blank(),
-        axis.ticks.y=element_blank(),
-        panel.border = element_blank(),
-        panel.grid.minor = element_blank(),
-        axis.line = element_line(colour = "black"))+
-  facet_wrap(~Time, ncol=1, labeller = label_both)
-p
-
-p <- ggplot(df, aes(x = Mean_Intensity_0, fill = factor(Drug_1_conc))) +
-  geom_histogram(bins = 100, alpha=.5) +
-  labs(x = "Intensity",
-       fill = "Ligand\nconcentration\nng/ml",
-       title = "Reporter intensity histograms") + 
-  theme_bw(base_size = ) + 
-  theme(axis.text.y=element_blank(),
-        axis.ticks.y=element_blank(),
-        panel.border = element_blank(),
-        panel.grid.minor = element_blank(),
-        axis.line = element_line(colour = "black"))+
-  facet_wrap(~Time, ncol=1, labeller = label_both)
-p
-
-p <- ggplot(df, aes(x = factor(Drug_1_conc), y = Mean_Intensity_0, fill = factor(Drug_1_conc))) +
-  geom_violin(alpha=.3) +
-  labs(x = "Ligand concentration (ng/ml)",
-       y = "Reporter intensity",
-       fill = "Ligand\nconcentration\nng/ml",
-       title = "Reporter intensity density plots") + 
-  theme_bw(base_size = ) + 
-  theme(panel.border = element_blank(),
-        panel.grid.minor = element_blank(),
-        axis.line = element_line(colour = "black"))+
-  facet_wrap(~Time, ncol=1, labeller = label_both)
-p
-
-p <- ggplot(df, aes(x = Distance_01, y = factor(Time))) +
-  geom_density_ridges() +
-  labs(x = "Distance",
-       y = "Time")
-p
-
-p <- ggplot(df, aes(x = mean_Mean_Intensity_0, y = factor(Time))) +
-  geom_density_ridges() + 
-    labs(x = "Mean intensity reporter 0",
-       y = "Time")
-p
-            
-```
-
-
-Mean nuclear intensity T0 normalized for a sampled set of cells that are present during the entire experiment.  
-
-```{r nuclearIntensityByCell, fig.width=8, fig.height=6, eval = FALSE}
-set.seed(42)
-df <- cd %>%
-  group_by(Well) %>%
-  select(Location_trackId, Well) %>%
-  distinct() %>%
-  sample_n(size = 12) %>%
-  inner_join(cd, by = c("Well", "Location_trackId"))
-
-p <- ggplot(cd, aes(x = Time, y = Mean_Intensity_0, group = factor(Location_trackId))) +
-  geom_line(colour="lightgray", alpha=.8, size=.4) +
-  guides(colour=FALSE) +
-  labs(title = "Nuclear intensity over time by well",
-       y = "Nuclear intensity (normalized to T0)",
-       x = unique(raw_data_metadata$Image_period_timeUnit)) + 
-  facet_wrap(~facet_label)
-p <- p + geom_line(data=df, aes(colour=factor(trackId)))
-p
+for(well_frame in unique(df$Location)) {
+  set.seed(42)
+ dfm <- df %>%
+   filter(Location == well_frame) %>%
+   select(lineageId, Location) %>%
+   distinct() %>%
+   sample_n(10, replace = TRUE) %>%
+   left_join(df) %>%
+   group_by(Location, trackId) %>%
+   mutate(CellCycleReporterNorm = Mean_Intensity_1/median(Mean_Intensity_1, na.rm = TRUE),
+          CellCycleReporterNorm = scales::squish(CellCycleReporterNorm, range = quantile(CellCycleReporterNorm, probs = c(.05, .98)))) %>%
+   ungroup()
+   mid <- 0
+ p <- ggplot(dfm, aes(x = Time/60, y = factor(Generation), colour = log10(CellCycleReporterNorm))) +
+   geom_path(size = 3) +
+   scale_color_gradient2(midpoint=mid, low="blue", mid="white",
+                         high="red", space ="Lab" )+
+   labs(x = "Hours",
+        y = NULL,
+        title = paste(unique(dfm$Drug_1), unique(dfm$Drug_1_conc)," nM"),
+        colour = "Nuclear\nintensity\nnormalized")
+ print(p)
+}
 
 ```
 
-Mean reporter intensity T0 normalized over time and by well. The gray lines are from all cells in the well. The colored lines are a random sample of cells in each well.  
-
-```{r reporterIntensityByCell, fig.width=8, fig.height=6, eval = FALSE}
-set.seed(42)
-df <- cd %>%
-  group_by(Well) %>%
-  select(Location_trackId, Well) %>%
-  distinct() %>%
-  sample_n(size = 12) %>%
-  inner_join(cd, by = c("Well", "Location_trackId"))
-
-p <- ggplot(cd, aes(x = Time, y = Mean_Intensity_0, group = factor(Location_trackId))) +
-  geom_line(colour="lightgray", alpha=.8, size=.4) +
-  guides(colour=FALSE) +
-  labs(title = "Reporter intensity over time by well",
-       y = "Reporter intensity (normalized to T0)",
-       x = unique(raw_data_metadata$Image_period_timeUnit)) + 
-  facet_wrap(~facet_label)
-p <- p + geom_line(data=df, aes(colour=factor(trackId)))
-p
-
-```
-
-Mean reporter intensity at various doses  
-
-```{r reporterIntensityByCellbyDose, fig.width=8, fig.height=6, eval = FALSE}
-df <- cd_small %>%
-  group_by(Location, Time) %>%
-  summarise(Mean_Intensity_0 = mean(Mean_Intensity_0),
-            Drug_1_conc = unique(Drug_1_conc)) %>%
-  ungroup()
-
-p <- ggplot(df, aes(x = Time, y = Mean_Intensity_0, colour=Location)) +
-  geom_line() +
-    labs(title = "Reporter intensity",
-       y = "Reporter intensity (normalized to T0)",
-       x = unique(raw_data_metadata$Image_period_timeUnit))
-p
-
-df <- cd_small %>%
-  group_by(Well, Time) %>%
-  summarise(Mean_Intensity_0 = mean(Mean_Intensity_0),
-                        Drug_1_conc = unique(Drug_1_conc)) %>%
-  ungroup()
-
-p <- ggplot(df, aes(x = Time, y = Mean_Intensity_0, colour=Well)) +
-  geom_line() + 
-    labs(title = "Reporter intensity dose responses",
-       y = "Reporter intensity (normalized to T0)",
-       x = unique(raw_data_metadata$Image_period_timeUnit)) 
-p
-
-p <- ggplot(df, aes(x = Time, y = Mean_Intensity_0, colour=factor(Drug_1_conc))) +
-  geom_line() + 
-    labs(title = "Reporter intensity dose responses",
-       y = "Reporter intensity (normalized to T0)",
-       x = unique(raw_data_metadata$Image_period_timeUnit),
-       colour = "Ligand\nconcentration(ng/ml)") 
-p
-
-```
 
