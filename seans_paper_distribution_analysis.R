@@ -3,20 +3,48 @@ library(tidyverse)
 library(readxl)
 library(tinytex)
 
-pdf(file = "Noise_distributions_combined.pdf")
-X129_IGFDose_T0Norm_Noise <- read_excel("129_IGFDose_T0Norm_Noise.xlsx") %>%
+# pdf(file = "Noise_distributions_combined.pdf")
+# X129_IGFDose_T0Norm_Noise <- read_excel("129_IGFDose_T0Norm_Noise.xlsx") %>%
+#   rename(IGF_I_0_pM = "1",
+#         IGF_I_5_pM = "2",
+#         IGF_I_10_pM = "3",
+#         IGF_I_15_pM = "4",
+#         IGF_I_25_pM = "6",
+#         IGF_I_40_pM = "8",
+#         IGF_I_125_pM = "11")
+# df <- gather(X129_IGFDose_T0Norm_Noise, key = "Dosage", value = "Noise") %>%
+#   mutate(Dosage = factor(Dosage,ordered = TRUE,levels = c("IGF_I_0_pM", "IGF_I_5_pM",   "IGF_I_10_pM", "IGF_I_15_pM",  "IGF_I_25_pM", "IGF_I_40_pM", "IGF_I_125_pM")))
+# unique(df$Dosage)
+# cols <- c("IGF_I_0_pM" = "#1a1919",    "IGF_I_5_pM" = "#253781",   "IGF_I_10_pM"  = "#283378", "IGF_I_15_pM" = "#009647",  "IGF_I_25_pM"  = "#e25e28", "IGF_I_40_pM"  = "#ee2f36","IGF_I_125_pM" = "#3b3b38")
+# p <- ggplot(df, aes(sample = Noise, colour = Dosage)) +
+#   stat_qq(alpha = .6) +
+#   stat_qq_line() +  
+#   scale_colour_manual(
+#     values = cols,
+#     aesthetics = c("colour")
+#   ) +
+#   theme_bw() +
+#   theme(panel.border = element_blank(),
+#         panel.grid = element_blank(),
+#         axis.line = element_line(colour = "black"))
+# 
+# plot(p)
+
+
+pdf(file = "Signal_distributions_combined.pdf")
+X129_IGFDose_T0Norm_Signal <- read_excel("129_IGFDose_T0Norm_Signal90.xlsx") %>%
   rename(IGF_I_0_pM = "1",
-        IGF_I_5_pM = "2",
-        IGF_I_10_pM = "3",
-        IGF_I_15_pM = "4",
-        IGF_I_25_pM = "6",
-        IGF_I_40_pM = "8",
-        IGF_I_125_pM = "11")
-df <- gather(X129_IGFDose_T0Norm_Noise, key = "Dosage", value = "Noise") %>%
+         IGF_I_5_pM = "2",
+         IGF_I_10_pM = "3",
+         IGF_I_15_pM = "4",
+         IGF_I_25_pM = "6",
+         IGF_I_40_pM = "8",
+         IGF_I_125_pM = "11")
+df <- gather(X129_IGFDose_T0Norm_Signal, key = "Dosage", value = "Signal") %>%
   mutate(Dosage = factor(Dosage,ordered = TRUE,levels = c("IGF_I_0_pM", "IGF_I_5_pM",   "IGF_I_10_pM", "IGF_I_15_pM",  "IGF_I_25_pM", "IGF_I_40_pM", "IGF_I_125_pM")))
 unique(df$Dosage)
 cols <- c("IGF_I_0_pM" = "#1a1919",    "IGF_I_5_pM" = "#253781",   "IGF_I_10_pM"  = "#283378", "IGF_I_15_pM" = "#009647",  "IGF_I_25_pM"  = "#e25e28", "IGF_I_40_pM"  = "#ee2f36","IGF_I_125_pM" = "#3b3b38")
-p <- ggplot(df, aes(sample = Noise, colour = Dosage)) +
+p <- ggplot(df, aes(sample = Signal, colour = Dosage)) +
   stat_qq(alpha = .6) +
   stat_qq_line() +  
   scale_colour_manual(
@@ -29,7 +57,6 @@ p <- ggplot(df, aes(sample = Noise, colour = Dosage)) +
         axis.line = element_line(colour = "black"))
 
 plot(p)
-
 # p <- ggplot(df, aes(sample = Noise)) +
 #   stat_qq(alpha = .5) +
 #   stat_qq_line() +
