@@ -1,6 +1,7 @@
 #Structure files and directories for processing
 library(tidyverse)
-raw_data_path <-  "/graylab/share/grossse/AU00701/"
+raw_data_path <-  "/data/share/grossse/AU_I_L_007_01_1/AU_I_L_007_01_1_IMAGES"
+new_raw_data_path <- "/eppec/storage/groups/heiserlab/image_scratch/AU_I_L_007_01_1"
 #Start in top level subdrectory
 #Get a tibble of the files in the dataset and split to create metadata
 files<- tibble(Full_filename=dir(raw_data_path,pattern = "tif", full.names = TRUE)) %>%
@@ -20,31 +21,43 @@ files<- tibble(Full_filename=dir(raw_data_path,pattern = "tif", full.names = TRU
 #beginning of a cleaner way to decode the metadata
 #foo <- lapply(beacon_list, str_split, pattern="_")
 
-createDirs <- function(dir_names, raw_data_path){
-  foo <- lapply(dir_names, function(dir_name){
-    full_dir_name <- paste0(raw_data_path,dir_name)
-    if(!dir.exists(full_dir_name)) dir.create(full_dir_name)
-    return(full_dir_name)
+createDirs <- function(dir_names){
+  #create well _location directories first
+  well_location_dirs <- dir_names %>%
+    select(New_dir_name) %>%
+    distinct() %>%
+    unlist()
+  dir_success <- lapply(well_location_dirs, function(well_location_dir){
+    if(!dir.exists(well_location_dir)) dir.create(well_location_dir)
   })
+  
+  unreg_dirs <- dir_names %>%
+    mutate(New_channel_dir_name = paste0(New_dir_name,"/",Channel,"_Unreg")) %>%
+    select(New_channel_dir_name) %>%
+    unlist()
+  
+  dir_success <- lapply(unreg_dirs, function(unreg_dir){
+    if(!dir.exists(unreg_dir)) dir.create(unreg_dir)
+  })
+  
 }
 
-copyFiles <- function(well_location, filename){
-  to_filename <- str_extract(filename, ".*/" ) %>%
-    paste0(well_location, "/",str_remove(filename, ".*/" ))
+copyFiles <- function(filename, new_file_path){
   #convert this to system(paste("mv",filename, to_filename))
-  file.copy(filename, to_filename)
+  foo <- lapply(seq_along(filename), function(i){
+    file.copy(filename[i], new_file_path[i])
+  })
 }
 
 #create directories for each well + location
 foo <- files %>%
-  select(Well_Location) %>%
+  select(Well_Location, Channel) %>%
   distinct() %>%
-  unlist() %>%
-  createDirs(raw_data_path)
+  mutate(New_dir_name = paste0(new_raw_data_path,"/",Well_Location)) %>%
+  createDirs()
 
 #Move files to the correct directory
 foo <- files %>%
-  select(Well_Location, Full_filename) %>%
-  group_by(Well_Location) %>%
-  mutate(foo = copyFiles(Well_Location, Full_filename))
-
+  select(Well_Location, Channel, Full_filename) %>%
+  mutate(New_file_path = paste0(new_raw_data_path,"/",Well_Location,"/",Channel,"_Unreg")) %>%
+  mutate(foo = copyFiles(Full_filename, New_file_path))
