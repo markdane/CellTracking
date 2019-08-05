@@ -1,0 +1,134 @@
+---
+title: "Manual_tracking_EDA"
+output:
+  html_document:
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(DT)
+
+```
+
+```{r}
+
+df_input <- read_csv("MTrackJ/MTrackJ- Points.csv", col_types = cols(
+  Nr = col_double(),
+  TID = col_double(),
+  PID = col_double(),
+  `x [pixel]` = col_double(),
+  `y [pixel]` = col_double(),
+  `t [sec]` = col_double(),
+  `I [val]` = col_double(),
+  `Len [pixel]` = col_double(),
+  `D2S [pixel]` = col_double(),
+  `D2R [pixel]` = col_logical(),
+  `D2P [pixel]` = col_double(),
+  `v [pixel/sec]` = col_double(),
+  `α [deg]` = col_double(),
+  `Δα [deg]` = col_double()
+)) 
+
+colnames(df_input) <- str_replace_all(colnames(df_input),"[ [:punct:][:blank:]]" ,"")
+
+```
+
+Extract the intensity values into a full matrix with cell number as the column names and time as the row names. Write these values to a file with empty strings in place of the missing data.  
+
+```{r format_intensities}
+df_intensities <- tibble(time = rep(min(df_input$tsec):max(df_input$tsec), each = length(unique(df_input$TID))),
+              cell = rep(unique(df_input$TID), times = length(unique(df_input$tsec)))) %>%
+  left_join(df_input, by = c("time" = "tsec", "cell" = "TID")) %>%
+  select(time, cell, Ival) %>%
+  spread(cell, Ival)
+
+datatable(df_intensities,caption = "Intensities of every cell over time")
+
+res <- write_csv(df_intensities,
+                 "MTrackJ_intensities_02082019.csv",
+                 na = "")
+```
+
+Plot cell migrations using a repeating, diverging pallette. Each dot is a cell. The first figure shows the absolute locations. The second figure shows the relative position from the cells initial position.  
+
+
+```{r plot_migration, fig.width=8, fig.height=8}
+df <- df_input %>%
+  select(TID, tsec, Ival)
+
+
+cols <- RColorBrewer::brewer.pal(9, name = "Set1")[sample(1:9, length(unique(df$TID)), replace = TRUE)]
+
+p <- ggplot(df_input, aes(xpixel, ypixel, colour = factor(TID))) +
+  geom_point(size = .5, alpha = .8) +
+  scale_colour_manual(values = cols) +    guides(colour = FALSE) +
+  guides(colour = FALSE) +
+  theme_bw()
+p
+
+T0_tracks <- df_input %>%
+  filter(tsec == 0)
+
+T0_rel <- df_input %>%
+  filter(PID == 1) %>%
+  select(TID, xpixel, ypixel) %>%
+  rename(x_T0_rel = xpixel,
+         y_T0_rel = ypixel) %>%
+  right_join(df_input, by = "TID") %>%
+  mutate(x_rel = xpixel-x_T0_rel,
+         y_rel = ypixel-y_T0_rel) %>%
+  select(x_rel, y_rel, TID) %>%
+  drop_na()
+
+cols <- RColorBrewer::brewer.pal(9, name = "Set1")[sample(1:9, length(unique(T0_rel$TID)), replace = TRUE)]
+
+unique(T0_rel$TID)
+p <- ggplot(T0_rel, aes(x_rel, y_rel, colour = factor(TID))) +
+  geom_point(size = .5, alpha = .8) +
+scale_colour_manual(values = cols) +    guides(colour = FALSE) +
+  theme_bw()
+p
+```
+
+#### MTrackJ file features
+
+    Nr: The measurement number. Runs from 1 to the total number of points.
+
+    CID: The ID number of the cluster to which the track point belongs. This quantity is not displayed if there is only one cluster and the user has deselected the displaying of cluster and assembly measurements.
+
+    TID: The ID number of the track to which the point belongs.
+
+    PID: The ID number of the point.
+
+    x [unit]: The calibrated x coordinate of the point. The pixel width and unit of length used here can be set as described above.
+
+    y [unit]: The calibrated y coordinate of the point. The pixel height and unit of length used here can be set as described above.
+
+    z [unit]: The calibrated z coordinate of the point. The voxel depth and unit of length used here can be set as described above. This quantity is not displayed in the case of 2D image sequences.
+
+    t [unit]: The calibrated t coordinate of the point. The frame interval and unit of time used here can be set as described above.
+
+    c [idx]: The channel index of the point. This quantity is not displayed if there is only one channel.
+
+    I [unit]: The calibrated image intensity value at the point. For 8-bit and 16-bit images, the intensity calibration function and value unit can be set (if necessary) as described above. For RGB-images, the intensity is computed as I = 0.3R + 0.6G + 0.1B. If the Edit > Options > Display > Interpolate Zoomed Images option of ImageJ is selected, the (calibrated) intensities are linearly interpolated where necessary (subpixel coordinate precision).
+
+    Len [unit]: The length of the track from the start (first) point of the track to the current point (inclusive). Thus the value of this quantity for the end (last) point of a track equals the total length of the track. The pixel calibration and unit of length used here can be set as described above.
+
+    D2S [unit]: The distance from the start (first) point of the track to the current point. Thus the value of this quantity is always less than (or at most equal to) the value of Len. The pixel calibration and unit of length used here can be set as described above.
+
+    D2R [unit]: The distance from the current point to the reference point (see the description of the Refer button for information on how to set the reference). The pixel calibration and unit of length used here can be set as described above.
+
+    D2P [unit]: The distance from the current to the previous point of the track. The pixel size and unit of length can be set as described above.
+
+    v [unit]: The speed, at the current point, of the object represented by the track. This quantity is computed as the magnitude of the most recent displacement vector (pointing from the previous point to the current point of the track), divided by the frame interval. The pixel calibration, unit of length, frame interval, and unit of time can be set as described above.
+
+    α [deg]: The angle of the in-plane component of the most recent displacement vector (pointing from the previous point to the current point of the track) with respect to the x-y coordinate system of the image (with the origin taken in the previous point). Angle values range from -180 to +180 degrees, where 0 degrees means the vector component runs parallel to the positive x axis (pointing to the right), +90 degrees (or -90 degrees) means it runs parallel to the positive (or negative) y axis (pointing downward, or upward, respectively), and +180 degrees (which is the same as -180 degrees) means it runs parallel to the negative x axis (pointing to the left). The pixel calibration can be set as described above.
+
+    Δα [deg]: The angular change between the in-plane components of the most recent displacement vector (pointing from the previous point to the current point of the track) and the preceding displacement vector. The pixel calibration can be set as described above.
+
+    θ [deg]: The angle of the most recent displacement vector (pointing from the previous point to the current point of the track) relative to the x-y plane of the image (with the origin taken in the previous point). The angle values range from -90 to +90 degrees, where 0 degrees means the axial vector component is zero (that is, the displacement vector is entirely in-plane), and +90 degrees (or -90 degrees) means it runs parallel to the positive (or negative) z axis (pointing away from, respectively toward, the observer). The pixel calibration can be set as described above. This quantity is not displayed in the case of 2D image sequences.
+
+    Δθ [deg]: The angular change between the most recent displacement vector (pointing from the previous point to the current point of the track) and the preceding displacement vector, relative to the x-y plane of the image. The pixel calibration can be set as described above. This quantity is not displayed in the case of 2D image sequences.

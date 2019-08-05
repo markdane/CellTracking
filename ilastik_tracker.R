@@ -14,7 +14,6 @@ res <- lapply(dirs, function(dir_path){
   message("tracking cells in: ",dir_path)
   well_location <- str_remove(dir_path,".*/")
 # Create csv files baed on nuclei probability masks
-  system(paste0('srun -c 4 /home/users/dane/ilastik-1.3.2b3-Linux/run_ilastik.sh --headless --readonly=True --project=/graylab/share/dane/CellTracking/RGB_Tracking.ilp --raw_data="',dir_path,'/Analysis/Composite_reg.tif" --prediction_maps=',dir_path,'/Analysis/Probabilities.h5 --export_source="Plugin" --export_plugin="CSV-Table"'),
          wait=FALSE)
 })
 
