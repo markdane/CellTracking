@@ -45,7 +45,7 @@ df_intensities <- tibble(time = rep(min(df_input$tsec):max(df_input$tsec), each 
   select(time, cell, Ival) %>%
   spread(cell, Ival)
 
-datatable(df_intensities,caption = "Intensities of every cell over time")
+datatable(df_intensities, caption = "Intensities of every cell over time")
 
 res <- write_csv(df_intensities,
                  "MTrackJ_intensities_02082019.csv",
@@ -91,6 +91,36 @@ p <- ggplot(T0_rel, aes(x_rel, y_rel, colour = factor(TID))) +
 scale_colour_manual(values = cols) +    guides(colour = FALSE) +
   theme_bw()
 p
+```
+
+
+#### Mother/daugther relationships
+
+Assumptions:
+The TID of the mother cell stops.  
+In the next time slot 2 new TIDs for daughter cells begin within close proximity of the last position of the mother cell.  
+
+
+```{r identify_divisions}
+
+label_status <- function(x){
+  alive <- which(!is.na(x))
+  pre_alive_indices <- which(is.na(x)) < min(alive)
+  pre_alive <- which(is.na(x))[pre_alive_indices]
+  dead <- which(is.na(x))[!pre_alive_indices]
+  y <- integer(length(x))
+  y[alive] <- 1
+  y[dead] <- 2
+  return(y)
+}
+
+new_tracks <- df_intensities %>%
+  gather(cell, intensity, -time) %>%
+  group_by(cell) %>%
+  mutate(status = label_status(intensity)) %>%
+ungroup()
+
+
 ```
 
 #### MTrackJ file features
