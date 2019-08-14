@@ -9,13 +9,14 @@ output:
 knitr::opts_chunk$set(echo = TRUE)
 
 library(tidyverse)
+library(RColorBrewer)
 library(DT)
 
 ```
 
 ```{r}
 
-df_input <- read_csv("MTrackJ/MTrackJ- Points.csv", col_types = cols(
+df_input <- read_csv("MTrackJ/MTrackJ-Points.csv", col_types = cols(
   Nr = col_double(),
   TID = col_double(),
   PID = col_double(),
