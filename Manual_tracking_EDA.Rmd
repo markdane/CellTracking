@@ -15,20 +15,25 @@ library(DT)
 ```
 
 ```{r}
+plateID <- "LI204701"
+well <- "A2"
+field <- 1
+filename <- paste(plateID,well, field, "Points.csv",sep = "_")
+out_filename <- paste(plateID,well, field, "intensities.csv",sep = "_")
 
-df_input <- read_csv("MTrackJ/MTrackJ-Points.csv", col_types = cols(
+df_input <- read_csv(paste0("MTrackJ/Data/",filename), col_types = cols(
   Nr = col_double(),
   TID = col_double(),
   PID = col_double(),
   `x [pixel]` = col_double(),
   `y [pixel]` = col_double(),
-  `t [sec]` = col_double(),
+  `t [min]` = col_double(),
   `I [val]` = col_double(),
   `Len [pixel]` = col_double(),
   `D2S [pixel]` = col_double(),
   `D2R [pixel]` = col_logical(),
   `D2P [pixel]` = col_double(),
-  `v [pixel/sec]` = col_double(),
+  `v [pixel/min]` = col_double(),
   `α [deg]` = col_double(),
   `Δα [deg]` = col_double()
 )) 
@@ -37,19 +42,21 @@ colnames(df_input) <- str_replace_all(colnames(df_input),"[ [:punct:][:blank:]]"
 
 ```
 
-Extract the intensity values into a full matrix with cell number as the column names and time as the row names. Write these values to a file with empty strings in place of the missing data.  
+Extract the intensity values into a full matrix with cell number as the column names and time as the row names. Write these values to a file named `r out_filename` with empty strings in place of the missing data.  
 
 ```{r format_intensities}
-df_intensities <- tibble(time = rep(min(df_input$tsec):max(df_input$tsec), each = length(unique(df_input$TID))),
-              cell = rep(unique(df_input$TID), times = length(unique(df_input$tsec)))) %>%
-  left_join(df_input, by = c("time" = "tsec", "cell" = "TID")) %>%
+####Debug problem with minutes vs seconds
+df_intensities <- tibble(time = rep(unique(df_input$tmin), each = length(unique(df_input$TID))),
+              cell = rep(unique(df_input$TID), times = length(unique(df_input$tmin)))) %>%
+  left_join(df_input, by = c("time" = "tmin", "cell" = "TID")) %>%
   select(time, cell, Ival) %>%
   spread(cell, Ival)
 
 datatable(df_intensities, caption = "Intensities of every cell over time")
 
+filename <- paste(plateID,well, field, "intensities.csv",sep = "_")
 res <- write_csv(df_intensities,
-                 "MTrackJ_intensities_02082019.csv",
+                 paste0("MTrackJ/Data/",out_filename),
                  na = "")
 ```
 
@@ -58,7 +65,7 @@ Plot cell migrations using a repeating, diverging pallette. Each dot is a cell. 
 
 ```{r plot_migration, fig.width=8, fig.height=8}
 df <- df_input %>%
-  select(TID, tsec, Ival)
+  select(TID, tmin, Ival)
 
 
 cols <- RColorBrewer::brewer.pal(9, name = "Set1")[sample(1:9, length(unique(df$TID)), replace = TRUE)]
@@ -71,7 +78,7 @@ p <- ggplot(df_input, aes(xpixel, ypixel, colour = factor(TID))) +
 p
 
 T0_tracks <- df_input %>%
-  filter(tsec == 0)
+  filter(tmin == 0)
 
 T0_rel <- df_input %>%
   filter(PID == 1) %>%
@@ -95,14 +102,14 @@ p
 ```
 
 
+```{r identify_divisions, eval = FALSE}
+
 #### Mother/daugther relationships
-
-Assumptions:
-The TID of the mother cell stops.  
-In the next time slot 2 new TIDs for daughter cells begin within close proximity of the last position of the mother cell.  
-
-
-```{r identify_divisions}
+# 
+# Assumptions:
+# The TID of the mother cell stops.  
+# In the next time slot 2 new TIDs for daughter cells begin within close proximity of the last position of the mother cell.  
+# 
 
 label_status <- function(x){
   alive <- which(!is.na(x))
