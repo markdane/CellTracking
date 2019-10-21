@@ -10,11 +10,6 @@ library(DT)
 ```
 
 ```{r}
-# plateID <- "LI204701"
-# well <- "A2"
-# field <- 1
-# filename <- paste(plateID,well, field, "Points.csv",sep = "_")
-# out_filename <- paste(plateID,well, field, "intensities.csv",sep = "_")
 
 df_input <- read_csv(paste0(path), col_types = cols(
   Nr = col_double(),
@@ -40,7 +35,6 @@ colnames(df_input) <- str_replace_all(colnames(df_input),"[ [:punct:][:blank:]]"
 Extract the intensity values into a full matrix with cell number as the column names and time as the row names. Write these values to a file named `r out_filename` with empty strings in place of the missing data.  
 
 ```{r format_intensities}
-####Debug problem with minutes vs seconds
 df_intensities <- tibble(time = rep(unique(df_input$tmin), each = length(unique(df_input$TID))),
               cell = rep(unique(df_input$TID), times = length(unique(df_input$tmin)))) %>%
   left_join(df_input, by = c("time" = "tmin", "cell" = "TID")) %>%
@@ -49,7 +43,7 @@ df_intensities <- tibble(time = rep(unique(df_input$tmin), each = length(unique(
 
 datatable(df_intensities, caption = "Intensities of every cell over time")
 
-filename <- paste(plateID,well, field, "intensities.csv",sep = "_")
+# filename <- paste(plateID,well, field, "intensities.csv",sep = "_")
 res <- write_csv(df_intensities,
                  paste0(out_filename),
                  na = "")
@@ -62,12 +56,12 @@ Plot cell migrations using a repeating, diverging pallette. Each dot is a cell. 
 df <- df_input %>%
   select(TID, tmin, Ival)
 
-
 cols <- RColorBrewer::brewer.pal(9, name = "Set1")[sample(1:9, length(unique(df$TID)), replace = TRUE)]
 
 p <- ggplot(df_input, aes(xpixel, ypixel, colour = factor(TID))) +
   geom_point(size = .5, alpha = .8) +
-  scale_colour_manual(values = cols) +    guides(colour = FALSE) +
+  geom_path(size = .5, alpha = .8) +
+  scale_colour_manual(values = cols) +
   guides(colour = FALSE) +
   theme_bw()
 p
@@ -88,10 +82,21 @@ T0_rel <- df_input %>%
 
 cols <- RColorBrewer::brewer.pal(9, name = "Set1")[sample(1:9, length(unique(T0_rel$TID)), replace = TRUE)]
 
-unique(T0_rel$TID)
+
 p <- ggplot(T0_rel, aes(x_rel, y_rel, colour = factor(TID))) +
   geom_point(size = .5, alpha = .8) +
-scale_colour_manual(values = cols) +    guides(colour = FALSE) +
+  geom_path(size = .5, alpha = .8) +
+  scale_colour_manual(values = cols) +
+  guides(colour = FALSE) +
+  theme_bw()
+p
+
+p <- ggplot(T0_rel, aes(x_rel, y_rel, colour = factor(TID))) +
+  geom_point(size = .5, alpha = .8) +
+  geom_path(size = .5, alpha = .8) +
+  coord_cartesian(xlim = c(-600, 600), ylim = c(-600,600)) +
+  scale_colour_manual(values = cols) +
+  guides(colour = FALSE) +
   theme_bw()
 p
 ```
