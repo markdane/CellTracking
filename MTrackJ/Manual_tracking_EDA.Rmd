@@ -1,9 +1,4 @@
----
-title: "Manual_tracking_EDA"
-output:
-  html_document:
-    code_folding: hide
----
+
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
@@ -15,13 +10,13 @@ library(DT)
 ```
 
 ```{r}
-plateID <- "LI204701"
-well <- "A2"
-field <- 1
-filename <- paste(plateID,well, field, "Points.csv",sep = "_")
-out_filename <- paste(plateID,well, field, "intensities.csv",sep = "_")
+# plateID <- "LI204701"
+# well <- "A2"
+# field <- 1
+# filename <- paste(plateID,well, field, "Points.csv",sep = "_")
+# out_filename <- paste(plateID,well, field, "intensities.csv",sep = "_")
 
-df_input <- read_csv(paste0("MTrackJ/Data/",filename), col_types = cols(
+df_input <- read_csv(paste0(path), col_types = cols(
   Nr = col_double(),
   TID = col_double(),
   PID = col_double(),
@@ -56,7 +51,7 @@ datatable(df_intensities, caption = "Intensities of every cell over time")
 
 filename <- paste(plateID,well, field, "intensities.csv",sep = "_")
 res <- write_csv(df_intensities,
-                 paste0("MTrackJ/Data/",out_filename),
+                 paste0(out_filename),
                  na = "")
 ```
 
