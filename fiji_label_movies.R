@@ -6,6 +6,7 @@ library(tidyverse)
 #use command line arguments to identify the plate ID
 plate_path = commandArgs(trailingOnly=TRUE)
 #plate_path <- "/eppec/storage/groups/heiserlab/image_scratch/LI_I_L_035_01_1"
+#plate_path <- "/Users/dane/Documents/image_scratch/LI_I_L_035_01_1"
 plateID <- str_remove(plate_path,".*/")
 message("processing metadata for ",plateID)
 

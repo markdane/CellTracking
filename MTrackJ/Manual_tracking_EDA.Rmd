@@ -40,8 +40,8 @@ df_intensities <- tibble(time = rep(unique(df_input$tmin), each = length(unique(
   left_join(df_input, by = c("time" = "tmin", "cell" = "TID")) %>%
   select(time, cell, Ival) %>%
   spread(cell, Ival)
-
-datatable(df_intensities, caption = "Intensities of every cell over time")
+# 
+# datatable(df_intensities, caption = "Intensities of every cell over time")
 
 # filename <- paste(plateID,well, field, "intensities.csv",sep = "_")
 res <- write_csv(df_intensities,
@@ -49,7 +49,7 @@ res <- write_csv(df_intensities,
                  na = "")
 ```
 
-Plot cell migrations using a repeating, diverging pallette. Each dot is a cell. The first figure shows the absolute locations. The second figure shows the relative position from the cells initial position.  
+Plot cell migrations using a repeating, diverging pallette. Each dot is a cell. The first figure shows the absolute locations. The second figure shows the relative position from the cells initial position. The third figure shows the relative motion with fixed x and y axis limits.  
 
 
 ```{r plot_migration, fig.width=8, fig.height=8}
