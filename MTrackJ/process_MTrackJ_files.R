@@ -1,4 +1,5 @@
 library(tidyverse)
+library(here)
 library(rmarkdown)
 
 #assume there is a subfolder named Data that contains data files
@@ -12,11 +13,12 @@ process_files <- function(path){
   report_name <- str_replace(path, "Data","Reports") %>%
     str_replace("_Points.csv",".html")
   
-  render("Manual_tracking_EDA.Rmd",
+  render("MTrackJ/Manual_tracking_EDA.Rmd",
          output_file = report_name,
          output_format = "html_document",
          output_options = list(code_folding = "hide"))
 }
  
-res <- dir("Data", pattern = "Points.csv", full.names = TRUE) %>%
+res <- dir("MTrackJ/Data", pattern = "Points.csv", full.names = TRUE)[1] %>%
+  here() %>%
   map(process_files)

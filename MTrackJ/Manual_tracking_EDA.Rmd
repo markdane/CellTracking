@@ -7,6 +7,8 @@ library(tidyverse)
 library(RColorBrewer)
 library(DT)
 
+###debug to run standalone from calling script
+path <- "/Users/dane/Documents/CellTracking/MTrackJ/Data/LI2042_A2_1_Points.csv"
 ```
 
 ```{r}
@@ -40,19 +42,19 @@ df_intensities <- tibble(time = rep(unique(df_input$tmin), each = length(unique(
   left_join(df_input, by = c("time" = "tmin", "cell" = "TID")) %>%
   select(time, cell, Ival) %>%
   spread(cell, Ival)
-
-datatable(df_intensities, caption = "Intensities of every cell over time")
+# 
+# datatable(df_intensities, caption = "Intensities of every cell over time")
 
 # filename <- paste(plateID,well, field, "intensities.csv",sep = "_")
-res <- write_csv(df_intensities,
-                 paste0(out_filename),
-                 na = "")
+# res <- write_csv(df_intensities,
+#                  paste0(out_filename),
+#                  na = "")
 ```
 
-Plot cell migrations using a repeating, diverging pallette. Each dot is a cell. The first figure shows the absolute locations. The second figure shows the relative position from the cells initial position.  
+Plot cell migrations using a repeating, diverging pallette. Each dot is a cell. The first figure shows the absolute locations. The second figure shows the relative position from the cells initial position. The third figure shows the relative motion with fixed x and y axis limits.  
 
 
-```{r plot_migration, fig.width=8, fig.height=8}
+```{r plot_migration, fig.width=4, fig.height=4}
 df <- df_input %>%
   select(TID, tmin, Ival)
 
@@ -102,7 +104,7 @@ p
 ```
 
 
-```{r identify_divisions, eval = FALSE}
+```{r identify_divisions, fig.width=6, fig.height=5}
 
 #### Mother/daugther relationships
 # 
@@ -111,23 +113,193 @@ p
 # In the next time slot 2 new TIDs for daughter cells begin within close proximity of the last position of the mother cell.  
 # 
 
+#label 0 if there is no cell and 1 if there's a cell
 label_status <- function(x){
-  alive <- which(!is.na(x))
-  pre_alive_indices <- which(is.na(x)) < min(alive)
-  pre_alive <- which(is.na(x))[pre_alive_indices]
-  dead <- which(is.na(x))[!pre_alive_indices]
-  y <- integer(length(x))
-  y[alive] <- 1
-  y[dead] <- 2
+  y <- rep(0, length(x))
+  y[!is.na(x)] <- 1
   return(y)
 }
 
+# return a vector that identifies when a cell is born or dies
+#  x[t+1] - x[t] = 0 if no change
+#                = -1 if a cell dies 
+#                = 1 if a cell is born
+
+label_changes <- function(x){
+  x_t_plus_1 <- x
+  x_t <- c(x[1], x[1:(length(x)-1)])
+  y <- x_t_plus_1 - x_t
+  
+  return(y)
+}
+
+# return a vector that identifies the time before a cell dies
+#  x[t+1] - x[t] = 0 if no change
+#                = -1 if a cell will die 
+#                = 1 if a cell is born
+
+label_last_time <- function(x){
+  y <- c(x[2:length(x)], x[length(x)])
+  y[y==1] <- 0
+  return(y)
+}
+
+#Add status and changes of birth and death
 new_tracks <- df_intensities %>%
   gather(cell, intensity, -time) %>%
   group_by(cell) %>%
-  mutate(status = label_status(intensity)) %>%
-ungroup()
+  mutate(status = label_status(intensity),
+         changes = label_changes(status),
+         last_time_measured = label_last_time(changes)) %>%
+  ungroup() %>%
+  mutate( cell = as.numeric(cell))
 
+#Get position of new cells
+tracks_with_births <- new_tracks %>%
+  filter(changes == 1) %>%
+  rename(cellID = cell) %>%
+  select(time, cellID) %>%
+   left_join(df_input, by = c("cellID" = "TID", "time" = "tmin")) %>%
+  select(time, cellID, xpixel, ypixel)
+
+#Get last position of disappearing cells
+tracks_last_time <- new_tracks %>%
+  filter(last_time_measured == -1) %>%
+  rename(mother = cell) %>%
+  select(time, mother) %>%
+  left_join(df_input, by = c("mother" = "TID", "time" = "tmin")) %>%
+  select(time, mother, xpixel, ypixel)
+
+position_threshold <- 25
+time_threshold <- 15
+
+#get mother IDs for tracks that start after time 0
+#find a cell that disapeared in this time slot and was nearby in the time slot before the birth
+select_IDs <- function(x) {
+  IDs <- tracks_with_births %>%
+  mutate(time_diff = abs(time - x["time"]),
+         position_dif = sqrt((x["xpixel"]-xpixel)^2+(x["ypixel"]-ypixel)^2)) %>%
+  filter(time_diff <= time_threshold,
+         position_dif <= position_threshold,
+         !time_diff == 0) %>%
+    mutate(motherID = x["mother"]) %>%
+    select(motherID, cellID)
+  return(IDs)
+}
+
+#find all birth events based on proximity of track end to tracks beginning
+all_births <-  apply(tracks_last_time, 1, select_IDs) %>%
+  bind_rows()
+
+first_gen <- df_input %>%
+  filter(tmin == 0) %>%
+  select(TID) %>%
+  rename(cellID = TID) %>%
+  mutate(motherID = 0,
+         generation = 1,
+         lineage = cellID) %>%
+  select(motherID, cellID, generation, lineage)
+
+
+#find all births with mothers in the first generation
+second_gen <- all_births %>%
+  inner_join(first_gen, by = c("motherID" = "cellID")) %>%
+  select(motherID, cellID, lineage) %>%
+  mutate(generation = 2)%>%
+  filter(!(motherID == cellID))
+
+#find all births with mothers in the second generation
+third_gen <- all_births %>%
+  inner_join(second_gen, by = c("motherID" = "cellID")) %>%
+  select(motherID, cellID, lineage) %>%
+  mutate(generation = 3)%>%
+  filter(!(motherID == cellID))
+
+fourth_gen <- all_births %>%
+  inner_join(third_gen, by = c("motherID" = "cellID")) %>%
+  select(motherID, cellID, lineage) %>%
+  mutate(generation = 4)%>%
+  filter(!(motherID == cellID))
+
+fifth_gen <- all_births %>%
+  inner_join(fourth_gen, by = c("motherID" = "cellID")) %>%
+  select(motherID, cellID, lineage) %>%
+  mutate(generation = 5)%>%
+  filter(!(motherID == cellID))
+
+sixth_gen <- all_births %>%
+  inner_join(fifth_gen, by = c("motherID" = "cellID")) %>%
+  select(motherID, cellID, lineage) %>%
+  mutate(generation = 6) %>%
+  filter(!(motherID == cellID))
+
+lineages_generations <- bind_rows(first_gen,
+                                  second_gen,
+                                  third_gen,
+                                  fourth_gen,
+                                  fifth_gen,
+                                  sixth_gen)
+
+
+#Add the mother IDs to each daughter
+df_lineage <- df_input %>%
+  left_join(lineages_generations, by = c("TID" = "cellID"))
+
+df_lineage$motherID[is.na(df_lineage$motherID)] <- df_lineage$TID[is.na(df_lineage$motherID)]
+
+p <- ggplot(df_lineage, aes(xpixel, ypixel, colour = factor(lineage))) +
+  geom_point(size = .5, alpha = .6) +
+  #geom_path(size = .5, alpha = .8) +
+  #scale_colour_manual(values = cols) +
+  guides(colour = FALSE) +
+  labs(title = "Colored by lineage") +
+  theme_bw()
+p
+
+p <- ggplot(df_lineage, aes(xpixel, ypixel, colour = factor(generation))) +
+  geom_point(size = .5, alpha = .8) +
+  #geom_path(size = .5, alpha = .8) +
+  #scale_colour_manual(values = cols) +
+  #guides(colour = FALSE) +
+  labs(title = "Colored by generation") +
+  theme_bw()
+p
+```
+
+```{r lineagedistributions, fig.width=4, fig.height=5}
+#count and didplay the number of cells in each lineage
+df <- df_lineage %>%
+  select(lineage, TID) %>%
+  distinct() %>%
+  group_by(lineage) %>%
+  summarise(count = n()) %>%
+  ungroup()
+p <- ggplot(df, aes(x = count)) +
+  geom_histogram(binwidth = 1)
+p
+
+p <- ggplot(df, aes(x = count,fill = "cornflower")) +
+  geom_density( alpha = .5) +
+  guides(fill = FALSE) +
+  labs(x = "Cells per lineage") +
+  coord_cartesian(xlim = c(1,25))
+p
+
+```
+
+```{r lineagePlots, fig.width=9, fig.height=8}
+#plot presence of cells vs time and grouped by lineage
+p <- ggplot(df_lineage, aes(x = tmin, y = TID, colour = factor(lineage))) +
+  geom_point() +
+  scale_color_ordinal() +
+  guides(color = FALSE)
+p
+
+p <- ggplot(df_lineage, aes(x = tmin, y = TID, color = generation)) +
+  geom_point(size = 1,  stroke = .01) +
+  facet_wrap(~lineage, scales = "free_y") +
+  theme(axis.text.x = element_text(angle = 90))
+p
 
 ```
 
