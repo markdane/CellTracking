@@ -8,12 +8,13 @@ library(RColorBrewer)
 library(DT)
 
 ###debug to run standalone from calling script
-path <- "/Users/dane/Documents/CellTracking/MTrackJ/Data/LI2042_A2_1_Points.csv"
+#path <- "/Users/dane/Documents/CellTracking/MTrackJ/Data/LI802303_A02_2_Points.csv"
+tmin_period = 30
 ```
 
 ```{r}
 
-df_input <- read_csv(paste0(path), col_types = cols(
+df_input_raw <- read_csv(paste0(path), col_types = cols(
   Nr = col_double(),
   TID = col_double(),
   PID = col_double(),
@@ -30,25 +31,52 @@ df_input <- read_csv(paste0(path), col_types = cols(
   `Δα [deg]` = col_double()
 )) 
 
-colnames(df_input) <- str_replace_all(colnames(df_input),"[ [:punct:][:blank:]]" ,"")
+colnames(df_input_raw) <- str_replace_all(colnames(df_input_raw),"[ [:punct:][:blank:]]" ,"")
+
+#get metadata for the plate
+metadata <- str_extract(path, ".*/") %>%
+  dir(pattern = "metadata", full.names = TRUE) %>%
+  readxl::read_xlsx()
+
+#get well name and treatement for this data
+wellName <- str_extract(path, "[AB]0[1234]")
+fieldName <- str_extract(path, "[AB]0[1234].*_Points") %>%
+  str_remove_all("[AB]0[1234]_|_Points")
+
+treatment <- metadata %>%
+  filter(well == wellName) %>%
+  pull(treatment)
+
+#check if the first track is included in the data
+QA_trackIDs <- function(x){
+  res <- 1 %in% x
+  return(res)
+}
+
+PID_QA <- df_input_raw %>%
+  group_by(TID) %>%
+  summarize(QA_pass = QA_trackIDs(PID)) %>%
+  ungroup() %>%
+  filter(QA_pass) %>%
+  pull(TID)
+
+df_input <- df_input_raw %>%
+  filter(TID %in% PID_QA) %>%
+  mutate(well = wellName,
+         field = fieldName,
+         treatment = treatment)
 
 ```
 
 Extract the intensity values into a full matrix with cell number as the column names and time as the row names. Write these values to a file named `r out_filename` with empty strings in place of the missing data.  
 
 ```{r format_intensities}
-df_intensities <- tibble(time = rep(unique(df_input$tmin), each = length(unique(df_input$TID))),
+df_intensities <- tibble(tmin = rep(unique(df_input$tmin), each = length(unique(df_input$TID))),
               cell = rep(unique(df_input$TID), times = length(unique(df_input$tmin)))) %>%
-  left_join(df_input, by = c("time" = "tmin", "cell" = "TID")) %>%
-  select(time, cell, Ival) %>%
+  left_join(df_input, by = c("tmin" = "tmin", "cell" = "TID")) %>%
+  select(tmin, cell, Ival) %>%
   spread(cell, Ival)
-# 
-# datatable(df_intensities, caption = "Intensities of every cell over time")
 
-# filename <- paste(plateID,well, field, "intensities.csv",sep = "_")
-# res <- write_csv(df_intensities,
-#                  paste0(out_filename),
-#                  na = "")
 ```
 
 Plot cell migrations using a repeating, diverging pallette. Each dot is a cell. The first figure shows the absolute locations. The second figure shows the relative position from the cells initial position. The third figure shows the relative motion with fixed x and y axis limits.  
@@ -65,11 +93,9 @@ p <- ggplot(df_input, aes(xpixel, ypixel, colour = factor(TID))) +
   geom_path(size = .5, alpha = .8) +
   scale_colour_manual(values = cols) +
   guides(colour = FALSE) +
+  labs(title = paste(treatment, "absolute tracks")) +
   theme_bw()
 p
-
-T0_tracks <- df_input %>%
-  filter(tmin == 0)
 
 T0_rel <- df_input %>%
   filter(PID == 1) %>%
@@ -90,6 +116,7 @@ p <- ggplot(T0_rel, aes(x_rel, y_rel, colour = factor(TID))) +
   geom_path(size = .5, alpha = .8) +
   scale_colour_manual(values = cols) +
   guides(colour = FALSE) +
+    labs(title = paste(treatment, "relative tracks")) +
   theme_bw()
 p
 
@@ -99,7 +126,8 @@ p <- ggplot(T0_rel, aes(x_rel, y_rel, colour = factor(TID))) +
   coord_cartesian(xlim = c(-600, 600), ylim = c(-600,600)) +
   scale_colour_manual(values = cols) +
   guides(colour = FALSE) +
-  theme_bw()
+  labs(title = paste(treatment, "relative tracks, fixed axes limits")) +
+theme_bw()
 p
 ```
 
@@ -146,7 +174,7 @@ label_last_time <- function(x){
 
 #Add status and changes of birth and death
 new_tracks <- df_intensities %>%
-  gather(cell, intensity, -time) %>%
+  gather(cell, intensity, -tmin) %>%
   group_by(cell) %>%
   mutate(status = label_status(intensity),
          changes = label_changes(status),
@@ -158,37 +186,90 @@ new_tracks <- df_intensities %>%
 tracks_with_births <- new_tracks %>%
   filter(changes == 1) %>%
   rename(cellID = cell) %>%
-  select(time, cellID) %>%
-   left_join(df_input, by = c("cellID" = "TID", "time" = "tmin")) %>%
-  select(time, cellID, xpixel, ypixel)
+  select(tmin, cellID) %>%
+   left_join(df_input, by = c("cellID" = "TID", "tmin" = "tmin")) %>%
+  select(tmin, cellID, xpixel, ypixel)
 
 #Get last position of disappearing cells
 tracks_last_time <- new_tracks %>%
   filter(last_time_measured == -1) %>%
-  rename(mother = cell) %>%
-  select(time, mother) %>%
-  left_join(df_input, by = c("mother" = "TID", "time" = "tmin")) %>%
-  select(time, mother, xpixel, ypixel)
+  rename(motherID = cell) %>%
+  select(tmin, motherID) %>%
+  left_join(df_input, by = c("motherID" = "TID", "tmin" = "tmin")) %>%
+  select(tmin, motherID, xpixel, ypixel)
 
-position_threshold <- 25
-time_threshold <- 15
+position_threshold <- 75
+time_threshold <- 30
 
 #get mother IDs for tracks that start after time 0
 #find a cell that disapeared in this time slot and was nearby in the time slot before the birth
+##DEVELOP
+#create a set of births in every time slot
+#for any non-empty birth set, create a set of tracks that ended in the previous time slot
+# calculate the position difference between all ending 
+# tracks and all starting tracks
+#kmeans cluster with k = to the number of ending tracks
+#check that no cluster has more than two elements
+
+# pseudocode
+#start with birth events - daughters
+#group by birth time slots
+#get tracks that ended in the curent or prior time slot - mothers
+#if there is only one mother track return it as mother-daughter pairs
+#when there are more than one mother
+#kmeans cluster features of mothers and daughters
+#k = number of mothers
+#return 
+# 
+# select_kmeans <- function(tmin, cellID, xpixel, ypixel){
+#   browser()
+#   current_time_slot <- unique(tmin)
+#   prior_tmin_slot <- current_time_slot - tmin_period
+#   if(prior_tmin_slot < 0) stop("trying to process birth before 2nd time period")
+#   mothers <- tracks_last_time %>%
+#     filter(tmin == prior_tmin_slot)
+#   if(!nrow(mothers) == 2*length(cellID)) {
+#     df <- tibble(cellID = cellID,
+#                  mother = -1
+#                  )
+#     return(df)
+#   }
+#   if(nrow(mothers) == 1 & length(cellID) == 2) {
+#     
+#     df <- tibble(cellID = cellID,
+#                  mother = mothers$mother
+#                  )
+#     return(df)
+#   } else {
+#     # kmeans cluster the daughters using k = nnumber of motehrs
+#     k <- nrow(mothers)
+#     res <-kmeans(cbind(xpixel, ypixel), centers = k)
+#   }
+# }
+#  
+# bar <-  tracks_with_births %>%
+#   group_by(tmin) %>%
+#   summarise(across(c(cellID, xpixel, ypixel), select_kmeans, xpixel =  xpixel, ypixel =  ypixel, tmin = tmin))
+# ####Debug problem with time 1230 having 4 daughtehrs and only one mother in the prior time slot
+# 
+# bar <-  tracks_with_births %>%
+#   group_by(tmin) %>%
+#   summarise(across(c(cellID, xpixel, ypixel), ~select_kmeans(cur_data())))
+
 select_IDs <- function(x) {
-  IDs <- tracks_with_births %>%
-  mutate(time_diff = abs(time - x["time"]),
+  IDs <- tracks_last_time %>%
+  mutate(tmin_diff = abs(tmin - x["tmin"]),
          position_dif = sqrt((x["xpixel"]-xpixel)^2+(x["ypixel"]-ypixel)^2)) %>%
-  filter(time_diff <= time_threshold,
-         position_dif <= position_threshold,
-         !time_diff == 0) %>%
-    mutate(motherID = x["mother"]) %>%
-    select(motherID, cellID)
+  filter(tmin_diff <= time_threshold,
+         position_dif <= position_threshold) %>%
+    slice_min(order_by = position_dif) %>%
+    mutate(cellID = x["cellID"])
+
   return(IDs)
 }
 
 #find all birth events based on proximity of track end to tracks beginning
-all_births <-  apply(tracks_last_time, 1, select_IDs) %>%
+all_births <-  apply(tracks_with_births, 1, select_IDs) %>%
   bind_rows()
 
 first_gen <- df_input %>%
@@ -242,10 +323,18 @@ lineages_generations <- bind_rows(first_gen,
 
 
 #Add the mother IDs to each daughter
-df_lineage <- df_input %>%
+df_lineage_raw <- df_input %>%
   left_join(lineages_generations, by = c("TID" = "cellID"))
 
-df_lineage$motherID[is.na(df_lineage$motherID)] <- df_lineage$TID[is.na(df_lineage$motherID)]
+#write out tracks that didn't get assoicated with a mother
+orphans <- df_lineage_raw %>%
+  filter(is.na(motherID))
+
+df_lineage <- df_lineage_raw %>%
+  filter(!is.na(motherID))
+  
+res <- write_csv(df_lineage, str_replace(path, "Points","lineages"))
+res <- write_csv(orphans, str_replace(path, "Points","orphans"))
 
 p <- ggplot(df_lineage, aes(xpixel, ypixel, colour = factor(lineage))) +
   geom_point(size = .5, alpha = .6) +
@@ -300,6 +389,53 @@ p <- ggplot(df_lineage, aes(x = tmin, y = TID, color = generation)) +
   facet_wrap(~lineage, scales = "free_y") +
   theme(axis.text.x = element_text(angle = 90))
 p
+
+```
+
+```{r motility}
+
+#average speed summarized by lineage
+
+  
+#average distance moved
+calc_distance <- function(x,y){
+  df <-data.frame(x,y)
+  mat <- dist(df) %>%
+    as.matrix()
+  res <- c(0, mat[col(mat)==row(mat)+1])
+  return(res)
+}
+df <- df_lineage %>%
+  group_by(TID) %>%
+  mutate(distance = calc_distance(xpixel, ypixel)) %>%
+  summarise(distance_mean = mean(distance),
+            distance_total = sum(distance),
+            average_speed = distance_mean/tmin_period) %>%
+  ungroup() %>%
+  right_join(df_lineage, by = "TID") %>%
+  select(TID, distance_mean, distance_total, average_speed, treatment,generation, lineage) %>%
+  distinct()
+  
+p <- ggplot(df, aes(x = TID, y = distance_mean,fill = factor(lineage))) +
+  geom_col() +
+  guides(fill = FALSE)
+p
+
+p <- ggplot(df, aes(x = TID, y = average_speed,fill = factor(lineage))) +
+  geom_col() +
+  guides(fill = FALSE)
+p
+  
+p <- ggplot(df, aes(x = TID, y = distance_total, fill = factor(lineage))) +
+  geom_col() +
+  guides(fill = FALSE)
+p
+    
+
+##Density
+#distance to nearest neighbor
+
+#number of neighbors within a fixed range
 
 ```
 
