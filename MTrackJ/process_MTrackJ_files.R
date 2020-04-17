@@ -19,6 +19,6 @@ process_files <- function(path){
          output_options = list(code_folding = "hide"))
 }
  
-res <- dir("MTrackJ/Data", pattern = "Points.csv", full.names = TRUE)[1] %>%
+res <- dir("MTrackJ/Data", pattern = "Points.csv", full.names = TRUE) %>%
   here() %>%
   map(process_files)
