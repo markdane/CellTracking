@@ -1,0 +1,173 @@
+---
+title: "MCF10A live cell image analysis"
+output: 
+  html_document:
+  code_folding: hide
+---
+
+```{r setup, include=FALSE, echo=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+
+library(tidyverse)
+library(RColorBrewer)
+
+```
+
+```{r}
+
+df_input <- dir("Data", pattern = "LI802303.*_lineages.csv$", full.names = TRUE)%>%
+  map(read_csv,
+      col_types = cols(
+        .default = col_double(),
+        D2Rpixel = col_logical(),
+        field = col_character(),
+        well = col_character(),
+        treatment = col_character()
+      )) %>%
+  map(tibble) %>%
+  bind_rows() %>%
+  mutate(well_field = paste0(well, "_",field))
+
+```
+
+
+```{r TIDdistributions, fig.width=3, fig.height=3}
+#count and didplay the number of cells in each lineage
+df <- df_input %>%
+  select(TID, field, well, treatment) %>%
+  distinct() 
+
+p <- ggplot(df, aes(x = treatment)) +
+  geom_bar() +
+  labs(title = "Count of cells in dataset") +
+  theme(axis.text.x = element_text(angle = 90))
+p
+
+df <- df_input %>%
+  select(lineage, field, well, treatment) %>%
+  distinct() 
+
+p <- ggplot(df, aes(x = treatment)) +
+  geom_bar() +
+  labs(title = "Count of lineages in dataset") +
+  theme(axis.text.x = element_text(angle = 90))
+p
+
+df <- df_input %>%
+  select(TID, lineage, field, well, treatment, distance_mean) %>%
+  group_by(treatment) %>%
+  summarise(distance_mean = mean(distance_mean, na.rm = TRUE)) %>%
+  ungroup()
+
+p <- ggplot(df, aes(x = treatment, y = distance_mean)) +
+  geom_col() +
+  labs(title = "Average cell movement",
+       subtitle = "(per 30 minute time period)",
+       y = "distance(pixels)") +
+  theme(axis.text.x = element_text(angle = 90))
+p
+
+```
+```{r migration_acorss_time, fig.width=5, fig.height=3}
+
+
+  
+p <- ggplot(df_input, aes(x = tmin, y = distance, colour = treatment)) +
+  geom_path(size = .1, alpha = .8) +
+  labs(title = "Migration distance over time",
+       x = "time (minutes)",
+       y = "distance moved (pixels)") +
+  theme_bw()
+p
+
+df <- df_input %>%
+  group_by(treatment, tmin) %>%
+  summarise(distance = mean(distance)) %>%
+  ungroup()
+
+p <- ggplot(df, aes(x = tmin, y = distance, colour = treatment)) +
+  geom_path(size = .8, alpha = .8) +
+    geom_point(size = .8)+
+  labs(title = "Migration distance over time",
+       x = "time (minutes)",
+       y = "distance moved (pixels)") +
+  theme_bw()
+p
+
+```
+
+
+
+```{r plot_migration, fig.width=6, fig.height=8}
+
+cols <- RColorBrewer::brewer.pal(9, name = "Set1")[sample(1:9, length(unique(df_input$TID)), replace = TRUE)]
+
+p <- ggplot(df_input, aes(xpixel, ypixel, colour = factor(TID))) +
+  geom_point(size = .1, alpha = .8) +
+  geom_path(size = .1, alpha = .8) +
+  scale_colour_manual(values = cols) +
+  guides(colour = FALSE) +
+  labs(title = "absolute tracks") +
+  theme_bw() +
+  theme(strip.text = element_text(size = 5, margin = margin()),
+        strip.background = element_rect(fill = "transparent")) +
+  facet_wrap(~well+field+treatment)
+p
+
+T0_rel <- df_input %>%
+  filter(PID == 1) %>%
+  select(well, field, TID, xpixel, ypixel) %>%
+  rename(x_T0_rel = xpixel,
+         y_T0_rel = ypixel) %>%
+  right_join(df_input, by = c("TID", "well", "field") )%>%
+  mutate(x_rel = xpixel-x_T0_rel,
+         y_rel = ypixel-y_T0_rel) %>%
+  select(x_rel, y_rel, TID, well, field, treatment) %>%
+  drop_na()
+
+cols <- RColorBrewer::brewer.pal(9, name = "Set1")[sample(1:9, length(unique(T0_rel$TID)), replace = TRUE)]
+
+
+p <- ggplot(T0_rel, aes(x_rel, y_rel, colour = factor(TID))) +
+  geom_point(size = .1, alpha = .8) +
+  geom_path(size = .1, alpha = .8) +
+  scale_colour_manual(values = cols) +
+  guides(colour = FALSE) +
+    labs(title = "relative tracks")+
+  theme_bw()+
+    theme(strip.text = element_text(size = 5, margin = margin()),
+        strip.background = element_rect(fill = "transparent")) +
+facet_wrap(~well+field+treatment)
+p
+
+
+```
+
+
+```{r plot_lineages, fig.width=6, fig.height=8}
+
+p <- ggplot(df_input, aes(xpixel, ypixel, colour = factor(lineage))) +
+  geom_point(size = .1, alpha = .6) +
+  guides(colour = FALSE) +
+  labs(title = "Colored by lineage") +
+  theme_bw()+
+   theme(strip.text = element_text(size = 5, margin = margin()),
+        strip.background = element_rect(fill = "transparent")) +
+ facet_wrap(~well+field+treatment)
+p
+
+```
+
+```{r plot_generations, fig.width=7, fig.height=8}
+
+
+p <- ggplot(df_input, aes(xpixel, ypixel, colour = factor(generation))) +
+  geom_point(size = .1, alpha = .8) +
+  labs(title = "Colored by generation",
+       colour = "Generation") +
+  theme_bw()+
+   theme(strip.text = element_text(size = 5, margin = margin()),
+        strip.background = element_rect(fill = "transparent")) +
+ facet_wrap(~well+field+treatment)
+p
+```

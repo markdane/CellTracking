@@ -3,15 +3,16 @@ library(EBImage)
 library(rhdf5)
 
 getGFPbackground <- function(redDirPath, GFPDirPath){
-  red <- dir(redDirPath, pattern = "Scene1Interval[[:digit:]]*.tif", full.names = TRUE)[1:3] %>%
+  red <- dir(redDirPath, pattern = "Scene1Interval[[:digit:]]*.tif", full.names = TRUE)%>%
     readImage()
-  GFP_filenames <- dir(GFPDirPath, pattern =  "Scene1Interval[[:digit:]]*.tif", full.names = TRUE)[1:3] 
+  
+  GFP_filenames <- dir(GFPDirPath, pattern =  "Scene1Interval[[:digit:]]*.tif", full.names = TRUE)
   GFP <- GFP_filenames %>%
     readImage()
   #Get nuclear probability 
   nuc_mask_dble <- dir(paste0(redDirPath,""), pattern = "Probabilities", full.names = TRUE) %>%
     h5read(name = "Beacon42") %>%
-    .[2,,,1:3]
+    .[2,,,]
   
   #convert nuclear probability masks to binary masks
   imageData(nuc_mask_dble)[imageData(nuc_mask_dble) > 0] <- 1
@@ -26,6 +27,8 @@ getGFPbackground <- function(redDirPath, GFPDirPath){
     bg_pixel_int <- imageData(background[,,i])[imageData(background[,,i])>0]
     bg_median <- median(bg_pixel_int)
     list(Filename = GFP_filenames[i], Background_median = bg_median)
+    #code to plot background
+    #ggplot(bind_rows(bg_data), aes(x=1:60, y=Background_median*2^16)) + geom_line()+labs(x="frame", y = "intensity")
   })
 } %>%
   bind_rows()
