@@ -8,7 +8,7 @@ library(RColorBrewer)
 library(DT)
 
 ###debug to run standalone from calling script
-#path <- "/Users/dane/Documents/CellTracking/MTrackJ/Data/LI802303_A02_2_Points.csv"
+#path <- "/Users/dane/Documents/CellTracking/MTrackJ/Data/LI802303_A02_X_2_Points.csv"
 tmin_period = 30
 ```
 
@@ -326,11 +326,32 @@ lineages_generations <- bind_rows(first_gen,
 df_lineage_raw <- df_input %>%
   left_join(lineages_generations, by = c("TID" = "cellID"))
 
+#average distance moved
+calc_distance <- function(x,y){
+  df <-data.frame(x,y)
+  mat <- dist(df) %>%
+    as.matrix()
+  res <- c(0, mat[col(mat)==row(mat)+1])
+  return(res)
+}
+
+df <- df_lineage_raw %>%
+  group_by(TID) %>%
+  mutate(distance = calc_distance(xpixel, ypixel)) %>%
+  summarise(distance_mean = mean(distance),
+            distance_total = sum(distance),
+            average_speed = distance_mean/tmin_period) %>%
+  ungroup() %>%
+  right_join(df_lineage_raw, by = "TID") %>%
+  group_by(TID) %>%
+  mutate(distance = calc_distance(xpixel, ypixel)) %>%
+  ungroup()
+
 #write out tracks that didn't get assoicated with a mother
-orphans <- df_lineage_raw %>%
+orphans <- df %>%
   filter(is.na(motherID))
 
-df_lineage <- df_lineage_raw %>%
+df_lineage <- df %>%
   filter(!is.na(motherID))
   
 res <- write_csv(df_lineage, str_replace(path, "Points","lineages"))
@@ -406,13 +427,6 @@ calc_distance <- function(x,y){
   return(res)
 }
 df <- df_lineage %>%
-  group_by(TID) %>%
-  mutate(distance = calc_distance(xpixel, ypixel)) %>%
-  summarise(distance_mean = mean(distance),
-            distance_total = sum(distance),
-            average_speed = distance_mean/tmin_period) %>%
-  ungroup() %>%
-  right_join(df_lineage, by = "TID") %>%
   select(TID, distance_mean, distance_total, average_speed, treatment,generation, lineage) %>%
   distinct()
   
