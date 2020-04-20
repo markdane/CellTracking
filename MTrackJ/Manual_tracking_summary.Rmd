@@ -28,6 +28,11 @@ df_input <- dir("Data", pattern = "LI802303.*_lineages.csv$", full.names = TRUE)
   bind_rows() %>%
   mutate(well_field = paste0(well, "_",field))
 
+foo <- df_input %>%
+  mutate(key = paste0(well_field,"_",TID)) %>%
+  select(key, motherID, treatment, well, TID) %>%
+  distinct()
+
 ```
 
 
@@ -103,7 +108,7 @@ p
 ```{r migration_facets, fig.width=8, fig.height=7}
 
 df <- df_input %>%
-  group_by(treatment, tmin, field) %>%
+  group_by(treatment, tmin, well, field) %>%
   summarise(distance = mean(distance)) %>%
   ungroup()
 
@@ -138,9 +143,11 @@ p <- ggplot(df_input, aes(xpixel, ypixel, colour = factor(TID))) +
         strip.background = element_rect(fill = "transparent")) +
   facet_wrap(~well+field+treatment)
 p
+
 ```
 
-```{r relative_migration, fig.width=8, fig.height=8}
+
+```{r relative_migration, fig.width=8, fig.height=7}
 
 T0_rel <- df_input %>%
   filter(PID == 1) %>%
@@ -150,7 +157,7 @@ T0_rel <- df_input %>%
   right_join(df_input, by = c("TID", "well", "field") )%>%
   mutate(x_rel = xpixel-x_T0_rel,
          y_rel = ypixel-y_T0_rel) %>%
-  select(x_rel, y_rel, TID, well, field, treatment, lineage) %>%
+  select(x_rel, y_rel, TID, well, field, treatment, lineage, generation, tmin) %>%
   drop_na()
 
 cols <- RColorBrewer::brewer.pal(9, name = "Set1")[sample(1:9, length(unique(T0_rel$TID)), replace = TRUE)]
@@ -189,7 +196,6 @@ p <- ggplot(T0_rel, aes(x_rel, y_rel, colour = factor(TID))) +
 p
 
 #balance the number of cells in each treatment
-
 min_treatment_tracks <- T0_rel %>%
   select(treatment, TID) %>%
   distinct() %>%
@@ -231,29 +237,28 @@ p <- ggplot(df, aes(x_rel, y_rel, colour = factor(TID))) +
   facet_wrap(~treatment)
 p
 
-
 #balance the number of lineages in each treatment
-
 min_treatment_lineages <- T0_rel %>%
-  select(treatment, lineage) %>%
+  select(treatment, lineage, generation) %>%
+  filter(generation == 1) %>%
   distinct() %>%
   count(treatment) %>%
   pull() %>%
   min()
 
-
 set.seed(42)
 lineages <- T0_rel %>%
-  select(treatment, lineage, field) %>%
+  select(treatment, lineage, well, field, generation) %>%
+    filter(generation == 1) %>%
   distinct() %>%
   group_by(treatment) %>%
   sample_n(size = min_treatment_lineages, replace = FALSE) %>%
   ungroup() %>%
-  mutate(key = paste0(field, "_", lineage))
+  mutate(key = paste0(well, "_", field, "_", lineage))
 
 df <- T0_rel %>%
-  mutate(key = paste0(field, "_", lineage)) %>%
-  filter(key %in% TIDs$key)
+  mutate(key = paste0(well, "_",field, "_", lineage)) %>%
+  filter(key %in% lineages$key)
   
 p <- ggplot(df, aes(x_rel, y_rel, colour = factor(lineage))) +
   #geom_point(size = .1, alpha = .8) +
@@ -261,7 +266,7 @@ p <- ggplot(df, aes(x_rel, y_rel, colour = factor(lineage))) +
   scale_colour_manual(values = cols) +
   #coord_cartesian(xlim = c(-900, 900), ylim = c(-900, 900)) +
   guides(colour = FALSE) +
-  labs(title = "relative lineages, balanced n")+
+  labs(title = "Relative motion of equal number of lineages")+
   theme_bw()+
   theme(strip.text = element_text(size = 12),
         strip.background = element_rect(fill = "transparent"),
@@ -275,8 +280,120 @@ p <- ggplot(df, aes(x_rel, y_rel, colour = factor(lineage))) +
   facet_wrap(~treatment)
 p
 
-```
+#select one daughter at each generation
+single_daughter_TIDs <- T0_rel %>%
+  mutate(key = paste0(well, "_",field, "_", lineage)) %>%
+  filter(key %in% lineages$key) %>%
+  select(TID, generation, key, treatment, lineage) %>%
+  distinct() %>%
+  group_by(key, generation) %>%
+  slice_head(n = 1) %>%
+  ungroup()
 
+df <-  T0_rel %>%
+    mutate(key = paste0(well, "_",field, "_", lineage)) %>%
+  right_join(single_daughter_TIDs, by = c("TID", "generation", "key", "lineage", "treatment"))
+
+p <- ggplot(df, aes(x_rel, y_rel, colour = factor(lineage))) +
+  #geom_point(size = .1, alpha = .8) +
+  geom_path(size = .4, alpha = .8) +
+  scale_colour_manual(values = cols) +
+  #coord_cartesian(xlim = c(-900, 900), ylim = c(-900, 900)) +
+  guides(colour = FALSE) +
+  labs(title = "Relative motion of equal number of lineages, one daughter")+
+  theme_bw()+
+  theme(strip.text = element_text(size = 12),
+        strip.background = element_rect(fill = "transparent"),
+        axis.title = element_blank(),
+       # axis.text = element_blank(),
+        #axis.ticks = element_blank(),
+        #panel.border = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.line =element_blank()) +
+  facet_wrap(~treatment)
+p
+
+p <- ggplot(df, aes(x = tmin, y = key)) +
+  geom_point() +
+  labs(title = "Lineages vs time to show missing data")
+p
+
+#link daughters to mothers and move all lineages to start at origin
+df_gen1_T0_rel <-  T0_rel %>%
+    mutate(key = paste0(well, "_",field, "_", lineage)) %>%
+  right_join(single_daughter_TIDs, by = c("TID", "generation", "key", "lineage", "treatment")) %>%
+  filter(generation == 1)
+
+df_daughters <- df_input  %>%
+    mutate(key = paste0(well, "_",field, "_", lineage)) %>%
+  right_join(single_daughter_TIDs, by = c("TID", "generation", "key", "lineage", "treatment"))  %>%
+  filter(!generation == 1) 
+
+df_daughters_gen1_rel <-  df_input %>%
+    mutate(key = paste0(well, "_",field, "_", lineage)) %>%
+  right_join(single_daughter_TIDs, by = c("TID", "generation", "key", "lineage", "treatment")) %>%
+  filter(generation == 1,
+         PID == 1) %>%
+   rename(x_T0 = xpixel,
+         y_T0 = ypixel) %>%
+  select(well, field, lineage, x_T0, y_T0) %>%
+  right_join(df_daughters, by = c("lineage", "well", "field")) %>%
+  mutate(x_rel = xpixel-x_T0,
+         y_rel = ypixel-y_T0) %>%
+  select(x_rel, y_rel, TID, well, field, treatment, lineage, generation, tmin) %>%
+  drop_na()
+
+df <- df_daughters_gen1_rel %>%
+  select(well, field, TID, treatment, lineage, generation, tmin, x_rel, y_rel) %>%
+  bind_rows(df_gen1_T0_rel)
+
+#####debug here... problem with mixed generations in the lineage at the same time
+foo <- df %>%
+  filter(well=="B03",
+         lineage == 2,
+         field == "D5_3")
+
+p <- ggplot(df, aes(x_rel, y_rel, colour = factor(lineage))) +
+  #geom_point(size = .1, alpha = .8) +
+  geom_path(size = .4, alpha = .8) +
+  scale_colour_manual(values = cols) +
+  #coord_cartesian(xlim = c(-900, 900), ylim = c(-900, 900)) +
+  guides(colour = FALSE) +
+  labs(title = "Relative motion of equal number of lineages, one daughter")+
+  theme_bw()+
+  theme(strip.text = element_text(size = 12),
+        strip.background = element_rect(fill = "transparent"),
+        axis.title = element_blank(),
+       # axis.text = element_blank(),
+        #axis.ticks = element_blank(),
+        #panel.border = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.line =element_blank()) +
+  facet_wrap(~treatment)
+p
+
+p <- ggplot(df, aes(x_rel, y_rel, colour = factor(generation))) +
+  #geom_point(size = .1, alpha = .8) +
+  geom_path(size = .4, alpha = .8) +
+  scale_colour_manual(values = cols) +
+  #coord_cartesian(xlim = c(-900, 900), ylim = c(-900, 900)) +
+  #guides(colour = FALSE) +
+  labs(title = "Relative motion of equal number of lineages, one daughter",
+       subtitle = "colored by generation")+
+  theme_bw()+
+  theme(strip.text = element_text(size = 12),
+        strip.background = element_rect(fill = "transparent"),
+        axis.title = element_blank(),
+       #axis.text = element_blank(),
+        #axis.ticks = element_blank(),
+        #panel.border = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.line =element_blank()) +
+  facet_wrap(~treatment)
+p
 ```
 
 
