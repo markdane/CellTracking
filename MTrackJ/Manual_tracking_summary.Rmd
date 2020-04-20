@@ -68,17 +68,20 @@ p <- ggplot(df, aes(x = treatment, y = distance_mean)) +
 p
 
 ```
-```{r migration_acorss_time, fig.width=5, fig.height=3}
 
 
-  
-p <- ggplot(df_input, aes(x = tmin, y = distance, colour = treatment)) +
-  geom_path(size = .1, alpha = .8) +
-  labs(title = "Migration distance over time",
-       x = "time (minutes)",
-       y = "distance moved (pixels)") +
-  theme_bw()
-p
+```{r migration_across_time, fig.width=5, fig.height=3}
+
+
+
+# p <- ggplot(df_input, aes(x = tmin, y = distance, colour = treatment)) +
+#   geom_path(size = .1, alpha = .2) +
+#   geom_smooth(method = "loess", formula = 'y ~ x', alpha = .8) +
+#   labs(title = "Migration distance over time",
+#        x = "time (minutes)",
+#        y = "distance moved (pixels)") +
+#   theme_bw()
+# p
 
 df <- df_input %>%
   group_by(treatment, tmin) %>%
@@ -86,12 +89,34 @@ df <- df_input %>%
   ungroup()
 
 p <- ggplot(df, aes(x = tmin, y = distance, colour = treatment)) +
-  geom_path(size = .8, alpha = .8) +
-    geom_point(size = .8)+
+  geom_path(size = .8, alpha = .4) +
+  geom_point(size = .8, alpha = .4)+
+  geom_smooth(method = "loess", formula = 'y ~ x'
+  )+
   labs(title = "Migration distance over time",
        x = "time (minutes)",
        y = "distance moved (pixels)") +
   theme_bw()
+p
+```
+
+```{r migration_facets, fig.width=8, fig.height=7}
+
+df <- df_input %>%
+  group_by(treatment, tmin, field) %>%
+  summarise(distance = mean(distance)) %>%
+  ungroup()
+
+p <- ggplot(df, aes(x = tmin, y = distance, colour = treatment, group = field)) +
+  geom_path(size = .8, alpha = .8) +
+  geom_point(size = .6)+
+  geom_smooth(method = "loess", formula = 'y ~ x'
+  )+
+  labs(title = "Migration distance over time",
+       x = "time (minutes)",
+       y = "distance moved (pixels)") +
+  theme_bw() +
+  facet_wrap(~treatment, ncol = 3)
 p
 
 ```
@@ -113,6 +138,9 @@ p <- ggplot(df_input, aes(xpixel, ypixel, colour = factor(TID))) +
         strip.background = element_rect(fill = "transparent")) +
   facet_wrap(~well+field+treatment)
 p
+```
+
+```{r relative_migration, fig.width=8, fig.height=8}
 
 T0_rel <- df_input %>%
   filter(PID == 1) %>%
@@ -122,7 +150,7 @@ T0_rel <- df_input %>%
   right_join(df_input, by = c("TID", "well", "field") )%>%
   mutate(x_rel = xpixel-x_T0_rel,
          y_rel = ypixel-y_T0_rel) %>%
-  select(x_rel, y_rel, TID, well, field, treatment) %>%
+  select(x_rel, y_rel, TID, well, field, treatment, lineage) %>%
   drop_na()
 
 cols <- RColorBrewer::brewer.pal(9, name = "Set1")[sample(1:9, length(unique(T0_rel$TID)), replace = TRUE)]
@@ -140,6 +168,114 @@ p <- ggplot(T0_rel, aes(x_rel, y_rel, colour = factor(TID))) +
 facet_wrap(~well+field+treatment)
 p
 
+p <- ggplot(T0_rel, aes(x_rel, y_rel, colour = factor(TID))) +
+  #geom_point(size = .1, alpha = .8) +
+  geom_path(size = .1, alpha = .8) +
+  scale_colour_manual(values = cols) +
+  coord_cartesian(xlim = c(-900, 900), ylim = c(-900, 900)) +
+  guides(colour = FALSE) +
+  labs(title = "relative tracks")+
+  theme_bw()+
+  theme(strip.text = element_text(size = 5, margin = margin()),
+        strip.background = element_rect(fill = "transparent"),
+        axis.title = element_blank(),
+       # axis.text = element_blank(),
+        #axis.ticks = element_blank(),
+        #panel.border = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.line =element_blank()) +
+  facet_wrap(~treatment)
+p
+
+#balance the number of cells in each treatment
+
+min_treatment_tracks <- T0_rel %>%
+  select(treatment, TID) %>%
+  distinct() %>%
+  count(treatment) %>%
+  pull() %>%
+  min()
+
+
+set.seed(42)
+TIDs <- T0_rel %>%
+  select(treatment, TID, field) %>%
+  distinct() %>%
+  group_by(treatment) %>%
+  sample_n(size = min_treatment_tracks,replace = FALSE) %>%
+  ungroup() %>%
+  mutate(key = paste0(field, "_", TID))
+
+df <- T0_rel %>%
+  mutate(key = paste0(field, "_", TID)) %>%
+  filter(key %in% TIDs$key)
+  
+p <- ggplot(df, aes(x_rel, y_rel, colour = factor(TID))) +
+  #geom_point(size = .1, alpha = .8) +
+  geom_path(size = .4, alpha = .8) +
+  scale_colour_manual(values = cols) +
+  #coord_cartesian(xlim = c(-900, 900), ylim = c(-900, 900)) +
+  guides(colour = FALSE) +
+  labs(title = "relative tracks, balanced n")+
+  theme_bw()+
+  theme(strip.text = element_text(size = 5, margin = margin()),
+        strip.background = element_rect(fill = "transparent"),
+        axis.title = element_blank(),
+       # axis.text = element_blank(),
+        #axis.ticks = element_blank(),
+        #panel.border = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.line =element_blank()) +
+  facet_wrap(~treatment)
+p
+
+
+#balance the number of lineages in each treatment
+
+min_treatment_lineages <- T0_rel %>%
+  select(treatment, lineage) %>%
+  distinct() %>%
+  count(treatment) %>%
+  pull() %>%
+  min()
+
+
+set.seed(42)
+lineages <- T0_rel %>%
+  select(treatment, lineage, field) %>%
+  distinct() %>%
+  group_by(treatment) %>%
+  sample_n(size = min_treatment_lineages, replace = FALSE) %>%
+  ungroup() %>%
+  mutate(key = paste0(field, "_", lineage))
+
+df <- T0_rel %>%
+  mutate(key = paste0(field, "_", lineage)) %>%
+  filter(key %in% TIDs$key)
+  
+p <- ggplot(df, aes(x_rel, y_rel, colour = factor(lineage))) +
+  #geom_point(size = .1, alpha = .8) +
+  geom_path(size = .4, alpha = .8) +
+  scale_colour_manual(values = cols) +
+  #coord_cartesian(xlim = c(-900, 900), ylim = c(-900, 900)) +
+  guides(colour = FALSE) +
+  labs(title = "relative lineages, balanced n")+
+  theme_bw()+
+  theme(strip.text = element_text(size = 12),
+        strip.background = element_rect(fill = "transparent"),
+        axis.title = element_blank(),
+       # axis.text = element_blank(),
+        #axis.ticks = element_blank(),
+        #panel.border = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.line =element_blank()) +
+  facet_wrap(~treatment)
+p
+
+```
 
 ```
 
