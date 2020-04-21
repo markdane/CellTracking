@@ -11,6 +11,8 @@ knitr::opts_chunk$set(echo = FALSE)
 library(tidyverse)
 library(RColorBrewer)
 
+create_pdfs <- TRUE
+
 ```
 
 ```{r}
@@ -26,12 +28,9 @@ df_input <- dir("Data", pattern = "LI802303.*_lineages.csv$", full.names = TRUE)
       )) %>%
   map(tibble) %>%
   bind_rows() %>%
-  mutate(well_field = paste0(well, "_",field))
+  mutate(well_field = paste0(well, "_",field),
+         thour = tmin/60)
 
-foo <- df_input %>%
-  mutate(key = paste0(well_field,"_",TID)) %>%
-  select(key, motherID, treatment, well, TID) %>%
-  distinct()
 
 ```
 
@@ -75,54 +74,61 @@ p
 ```
 
 
-```{r migration_across_time, fig.width=5, fig.height=3}
-
-
-
-# p <- ggplot(df_input, aes(x = tmin, y = distance, colour = treatment)) +
-#   geom_path(size = .1, alpha = .2) +
-#   geom_smooth(method = "loess", formula = 'y ~ x', alpha = .8) +
-#   labs(title = "Migration distance over time",
-#        x = "time (minutes)",
-#        y = "distance moved (pixels)") +
-#   theme_bw()
-# p
+```{r migration_across_time, fig.width=8, fig.height=5}
 
 df <- df_input %>%
-  group_by(treatment, tmin) %>%
+  group_by(treatment, thour) %>%
   summarise(distance = mean(distance)) %>%
   ungroup()
 
-p <- ggplot(df, aes(x = tmin, y = distance, colour = treatment)) +
-  geom_path(size = .8, alpha = .4) +
+p <- ggplot(df, aes(x = thour, y = distance, colour = treatment)) +
+  geom_path(size = .8, alpha = .6) +
   geom_point(size = .8, alpha = .4)+
-  geom_smooth(method = "loess", formula = 'y ~ x'
+  geom_smooth(method = "loess", formula = 'y ~ x', alpha = .8, se = FALSE
   )+
+  coord_cartesian(xlim = c(0,48)) +
+  scale_x_continuous(breaks = c(0,12,24,36,48)) +
   labs(title = "Migration distance over time",
-       x = "time (minutes)",
+       x = "time (hours)",
        y = "distance moved (pixels)") +
   theme_bw()
 p
+
+if(create_pdfs){
+  pdf("MDD_migration_distance_summarized.pdf", useDingbats = FALSE, width = 8, height = 5)
+  print(p)
+  res <- dev.off()
+}
+
 ```
 
 ```{r migration_facets, fig.width=8, fig.height=7}
 
 df <- df_input %>%
-  group_by(treatment, tmin, well, field) %>%
+  group_by(treatment, thour, well, field) %>%
   summarise(distance = mean(distance)) %>%
   ungroup()
 
-p <- ggplot(df, aes(x = tmin, y = distance, colour = treatment, group = field)) +
-  geom_path(size = .8, alpha = .8) +
-  geom_point(size = .6)+
-  geom_smooth(method = "loess", formula = 'y ~ x'
+p <- ggplot(df, aes(x = thour, y = distance, colour = treatment, group = field)) +
+  geom_path(size = .4, alpha = .8) +
+  geom_point(size = .4, alpha = .4)+
+  geom_smooth(method = "loess", formula = 'y ~ x', alpha = .8, se = FALSE
   )+
+  coord_cartesian(xlim = c(0,48),
+                  ylim = c(0,35)) +
+  scale_x_continuous(breaks = c(0,12,24,36,48)) +
   labs(title = "Migration distance over time",
        x = "time (minutes)",
        y = "distance moved (pixels)") +
   theme_bw() +
-  facet_wrap(~treatment, ncol = 3)
+  facet_wrap(~treatment, ncol = 4)
 p
+
+if(create_pdfs){
+  pdf("MDD_migration_distance.pdf", useDingbats = FALSE, width = 8, height = 5)
+  print(p)
+  res <- dev.off()
+}
 
 ```
 
@@ -137,7 +143,7 @@ p <- ggplot(df_input, aes(xpixel, ypixel, colour = factor(TID))) +
   geom_path(size = .1, alpha = .8) +
   scale_colour_manual(values = cols) +
   guides(colour = FALSE) +
-  labs(title = "absolute tracks") +
+  labs(title = "absolute positions, all data") +
   theme_bw() +
   theme(strip.text = element_text(size = 5, margin = margin()),
         strip.background = element_rect(fill = "transparent")) +
@@ -176,7 +182,6 @@ facet_wrap(~well+field+treatment)
 p
 
 p <- ggplot(T0_rel, aes(x_rel, y_rel, colour = factor(TID))) +
-  #geom_point(size = .1, alpha = .8) +
   geom_path(size = .1, alpha = .8) +
   scale_colour_manual(values = cols) +
   coord_cartesian(xlim = c(-900, 900), ylim = c(-900, 900)) +
@@ -186,14 +191,11 @@ p <- ggplot(T0_rel, aes(x_rel, y_rel, colour = factor(TID))) +
   theme(strip.text = element_text(size = 5, margin = margin()),
         strip.background = element_rect(fill = "transparent"),
         axis.title = element_blank(),
-       # axis.text = element_blank(),
-        #axis.ticks = element_blank(),
-        #panel.border = element_blank(),
         panel.grid.major = element_blank(),
         panel.grid.minor = element_blank(),
         axis.line =element_blank()) +
   facet_wrap(~treatment)
-p
+#p
 
 #balance the number of cells in each treatment
 min_treatment_tracks <- T0_rel %>%
@@ -228,14 +230,11 @@ p <- ggplot(df, aes(x_rel, y_rel, colour = factor(TID))) +
   theme(strip.text = element_text(size = 5, margin = margin()),
         strip.background = element_rect(fill = "transparent"),
         axis.title = element_blank(),
-       # axis.text = element_blank(),
-        #axis.ticks = element_blank(),
-        #panel.border = element_blank(),
         panel.grid.major = element_blank(),
         panel.grid.minor = element_blank(),
         axis.line =element_blank()) +
   facet_wrap(~treatment)
-p
+#p
 
 #balance the number of lineages in each treatment
 min_treatment_lineages <- T0_rel %>%
@@ -278,46 +277,22 @@ p <- ggplot(df, aes(x_rel, y_rel, colour = factor(lineage))) +
         panel.grid.minor = element_blank(),
         axis.line =element_blank()) +
   facet_wrap(~treatment)
-p
+#p
 
 #select one daughter at each generation
-single_daughter_TIDs <- T0_rel %>%
+single_daughter_data <- df_input %>%
   mutate(key = paste0(well, "_",field, "_", lineage)) %>%
   filter(key %in% lineages$key) %>%
-  select(TID, generation, key, treatment, lineage) %>%
+  select(TID, generation, key, treatment, lineage, tmin, xpixel, ypixel) %>%
   distinct() %>%
-  group_by(key, generation) %>%
+  group_by(key, lineage, tmin) %>%
+  arrange(generation, TID) %>%
   slice_head(n = 1) %>%
   ungroup()
 
-df <-  T0_rel %>%
-    mutate(key = paste0(well, "_",field, "_", lineage)) %>%
-  right_join(single_daughter_TIDs, by = c("TID", "generation", "key", "lineage", "treatment"))
-
-p <- ggplot(df, aes(x_rel, y_rel, colour = factor(lineage))) +
-  #geom_point(size = .1, alpha = .8) +
-  geom_path(size = .4, alpha = .8) +
-  scale_colour_manual(values = cols) +
-  #coord_cartesian(xlim = c(-900, 900), ylim = c(-900, 900)) +
-  guides(colour = FALSE) +
-  labs(title = "Relative motion of equal number of lineages, one daughter")+
-  theme_bw()+
-  theme(strip.text = element_text(size = 12),
-        strip.background = element_rect(fill = "transparent"),
-        axis.title = element_blank(),
-       # axis.text = element_blank(),
-        #axis.ticks = element_blank(),
-        #panel.border = element_blank(),
-        panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank(),
-        axis.line =element_blank()) +
-  facet_wrap(~treatment)
-p
-
-p <- ggplot(df, aes(x = tmin, y = key)) +
-  geom_point() +
-  labs(title = "Lineages vs time to show missing data")
-p
+single_daughter_TIDs <- single_daughter_data %>%
+  select(key, treatment, lineage, generation, TID) %>%
+  distinct()
 
 #link daughters to mothers and move all lineages to start at origin
 df_gen1_T0_rel <-  T0_rel %>%
@@ -348,11 +323,10 @@ df <- df_daughters_gen1_rel %>%
   select(well, field, TID, treatment, lineage, generation, tmin, x_rel, y_rel) %>%
   bind_rows(df_gen1_T0_rel)
 
-#####debug here... problem with mixed generations in the lineage at the same time
-foo <- df %>%
-  filter(well=="B03",
-         lineage == 2,
-         field == "D5_3")
+p <- ggplot(df, aes(x = tmin, y = key)) +
+  geom_point() +
+  labs(title = "Lineages vs time to show missing data")
+p
 
 p <- ggplot(df, aes(x_rel, y_rel, colour = factor(lineage))) +
   #geom_point(size = .1, alpha = .8) +
@@ -360,7 +334,7 @@ p <- ggplot(df, aes(x_rel, y_rel, colour = factor(lineage))) +
   scale_colour_manual(values = cols) +
   #coord_cartesian(xlim = c(-900, 900), ylim = c(-900, 900)) +
   guides(colour = FALSE) +
-  labs(title = "Relative motion of equal number of lineages, one daughter")+
+  labs(title = "Relative motion of equal number of lineages")+
   theme_bw()+
   theme(strip.text = element_text(size = 12),
         strip.background = element_rect(fill = "transparent"),
@@ -373,6 +347,14 @@ p <- ggplot(df, aes(x_rel, y_rel, colour = factor(lineage))) +
         axis.line =element_blank()) +
   facet_wrap(~treatment)
 p
+
+
+if(create_pdfs){
+  pdf("MDD_migration_relative_tracks.pdf", useDingbats = FALSE, width = 8, height = 5)
+  print(p)
+  res <- dev.off()
+}
+
 
 p <- ggplot(df, aes(x_rel, y_rel, colour = factor(generation))) +
   #geom_point(size = .1, alpha = .8) +
@@ -393,7 +375,7 @@ p <- ggplot(df, aes(x_rel, y_rel, colour = factor(generation))) +
         panel.grid.minor = element_blank(),
         axis.line =element_blank()) +
   facet_wrap(~treatment)
-p
+#p
 ```
 
 
@@ -407,7 +389,7 @@ p <- ggplot(df_input, aes(xpixel, ypixel, colour = factor(lineage))) +
    theme(strip.text = element_text(size = 5, margin = margin()),
         strip.background = element_rect(fill = "transparent")) +
  facet_wrap(~well+field+treatment)
-p
+#p
 
 ```
 
@@ -422,5 +404,5 @@ p <- ggplot(df_input, aes(xpixel, ypixel, colour = factor(generation))) +
    theme(strip.text = element_text(size = 5, margin = margin()),
         strip.background = element_rect(fill = "transparent")) +
  facet_wrap(~well+field+treatment)
-p
+#p
 ```
