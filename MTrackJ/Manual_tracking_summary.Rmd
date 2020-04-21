@@ -155,7 +155,7 @@ p
 ```
 
 
-```{r relative_migration, fig.width=8, fig.height=7}
+```{r relative_migration, fig.width=8, fig.height=8}
 
 T0_rel <- df_input %>%
   filter(PID == 1) %>%
@@ -175,34 +175,16 @@ p <- ggplot(T0_rel, aes(x_rel, y_rel, colour = factor(TID))) +
   geom_path(size = .1, alpha = .8) +
   scale_colour_manual(values = cols) +
   guides(colour = FALSE) +
-    labs(title = "relative tracks")+
+    labs(title = "relative tracks",
+         subtitle = "all tracks start at the origin")+
   theme_bw()+
     theme(strip.text = element_text(size = 5, margin = margin()),
         strip.background = element_rect(fill = "transparent")) +
 facet_wrap(~well+field+treatment)
 p
+```
 
-#balance the number of cells in each treatment
-min_treatment_tracks <- T0_rel %>%
-  select(treatment, TID) %>%
-  distinct() %>%
-  count(treatment) %>%
-  pull() %>%
-  min()
-
-set.seed(42)
-TIDs <- T0_rel %>%
-  select(treatment, TID, field) %>%
-  distinct() %>%
-  group_by(treatment) %>%
-  sample_n(size = min_treatment_tracks,replace = FALSE) %>%
-  ungroup() %>%
-  mutate(key = paste0(field, "_", TID))
-
-df <- T0_rel %>%
-  mutate(key = paste0(field, "_", TID)) %>%
-  filter(key %in% TIDs$key)
- 
+```{r relative_migration_linked, fig.width=8, fig.height=5}
 #balance the number of lineages in each treatment
 min_treatment_lineages <- T0_rel %>%
   select(treatment, lineage, generation) %>%
@@ -222,10 +204,7 @@ lineages <- T0_rel %>%
   ungroup() %>%
   mutate(key = paste0(well, "_", field, "_", lineage))
 
-df <- T0_rel %>%
-  mutate(key = paste0(well, "_",field, "_", lineage)) %>%
-  filter(key %in% lineages$key)
-  
+
 #select one daughter at each generation
 single_daughter_data <- df_input %>%
   mutate(key = paste0(well, "_",field, "_", lineage)) %>%
@@ -263,16 +242,19 @@ df_daughters_gen1_rel <-  df_input %>%
   right_join(df_daughters, by = c("lineage", "well", "field")) %>%
   mutate(x_rel = xpixel-x_T0,
          y_rel = ypixel-y_T0) %>%
-  select(x_rel, y_rel, TID, well, field, treatment, lineage, generation, tmin) %>%
+  select(x_rel, y_rel, TID, key, well, field, treatment, lineage, generation, tmin) %>%
   drop_na()
 
 df <- df_daughters_gen1_rel %>%
-  select(well, field, TID, treatment, lineage, generation, tmin, x_rel, y_rel) %>%
+  select(key, well, field, TID, treatment, lineage, generation, tmin, x_rel, y_rel) %>%
   bind_rows(df_gen1_T0_rel)
 
 p <- ggplot(df, aes(x = tmin, y = key)) +
-  geom_point() +
-  labs(title = "Lineages vs time to show missing data")
+  geom_point(size = 1.2) +
+  labs(title = "Lineages vs time to show missing data") +
+  theme_bw()+
+  theme(axis.text.y = element_text(size = 4))
+
 p
 
 p <- ggplot(df, aes(x_rel, y_rel, colour = factor(lineage))) +
