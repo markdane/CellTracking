@@ -31,12 +31,12 @@ df_input <- dir("Data", pattern = "LI802303.*_lineages.csv$", full.names = TRUE)
   mutate(well_field = paste0(well, "_",field),
          thour = tmin/60)
 
-
 ```
 
 
 ```{r TIDdistributions, fig.width=3, fig.height=3}
-#count and didplay the number of cells in each lineage
+
+#count and display the number of cells in each lineage
 df <- df_input %>%
   select(TID, field, well, treatment) %>%
   distinct() 
@@ -46,6 +46,8 @@ p <- ggplot(df, aes(x = treatment)) +
   labs(title = "Count of cells in dataset") +
   theme(axis.text.x = element_text(angle = 90))
 p
+
+#count and display the number of lineages in each lineage
 
 df <- df_input %>%
   select(lineage, field, well, treatment) %>%
@@ -125,7 +127,7 @@ p <- ggplot(df, aes(x = thour, y = distance, colour = treatment, group = field))
 p
 
 if(create_pdfs){
-  pdf("MDD_migration_distance.pdf", useDingbats = FALSE, width = 8, height = 5)
+  pdf("MDD_migration_distance.pdf", useDingbats = FALSE, width = 8, height = 4)
   print(p)
   res <- dev.off()
 }
@@ -168,7 +170,6 @@ T0_rel <- df_input %>%
 
 cols <- RColorBrewer::brewer.pal(9, name = "Set1")[sample(1:9, length(unique(T0_rel$TID)), replace = TRUE)]
 
-
 p <- ggplot(T0_rel, aes(x_rel, y_rel, colour = factor(TID))) +
   geom_point(size = .1, alpha = .8) +
   geom_path(size = .1, alpha = .8) +
@@ -181,22 +182,6 @@ p <- ggplot(T0_rel, aes(x_rel, y_rel, colour = factor(TID))) +
 facet_wrap(~well+field+treatment)
 p
 
-p <- ggplot(T0_rel, aes(x_rel, y_rel, colour = factor(TID))) +
-  geom_path(size = .1, alpha = .8) +
-  scale_colour_manual(values = cols) +
-  coord_cartesian(xlim = c(-900, 900), ylim = c(-900, 900)) +
-  guides(colour = FALSE) +
-  labs(title = "relative tracks")+
-  theme_bw()+
-  theme(strip.text = element_text(size = 5, margin = margin()),
-        strip.background = element_rect(fill = "transparent"),
-        axis.title = element_blank(),
-        panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank(),
-        axis.line =element_blank()) +
-  facet_wrap(~treatment)
-#p
-
 #balance the number of cells in each treatment
 min_treatment_tracks <- T0_rel %>%
   select(treatment, TID) %>%
@@ -204,7 +189,6 @@ min_treatment_tracks <- T0_rel %>%
   count(treatment) %>%
   pull() %>%
   min()
-
 
 set.seed(42)
 TIDs <- T0_rel %>%
@@ -218,24 +202,7 @@ TIDs <- T0_rel %>%
 df <- T0_rel %>%
   mutate(key = paste0(field, "_", TID)) %>%
   filter(key %in% TIDs$key)
-  
-p <- ggplot(df, aes(x_rel, y_rel, colour = factor(TID))) +
-  #geom_point(size = .1, alpha = .8) +
-  geom_path(size = .4, alpha = .8) +
-  scale_colour_manual(values = cols) +
-  #coord_cartesian(xlim = c(-900, 900), ylim = c(-900, 900)) +
-  guides(colour = FALSE) +
-  labs(title = "relative tracks, balanced n")+
-  theme_bw()+
-  theme(strip.text = element_text(size = 5, margin = margin()),
-        strip.background = element_rect(fill = "transparent"),
-        axis.title = element_blank(),
-        panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank(),
-        axis.line =element_blank()) +
-  facet_wrap(~treatment)
-#p
-
+ 
 #balance the number of lineages in each treatment
 min_treatment_lineages <- T0_rel %>%
   select(treatment, lineage, generation) %>%
@@ -259,26 +226,6 @@ df <- T0_rel %>%
   mutate(key = paste0(well, "_",field, "_", lineage)) %>%
   filter(key %in% lineages$key)
   
-p <- ggplot(df, aes(x_rel, y_rel, colour = factor(lineage))) +
-  #geom_point(size = .1, alpha = .8) +
-  geom_path(size = .4, alpha = .8) +
-  scale_colour_manual(values = cols) +
-  #coord_cartesian(xlim = c(-900, 900), ylim = c(-900, 900)) +
-  guides(colour = FALSE) +
-  labs(title = "Relative motion of equal number of lineages")+
-  theme_bw()+
-  theme(strip.text = element_text(size = 12),
-        strip.background = element_rect(fill = "transparent"),
-        axis.title = element_blank(),
-       # axis.text = element_blank(),
-        #axis.ticks = element_blank(),
-        #panel.border = element_blank(),
-        panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank(),
-        axis.line =element_blank()) +
-  facet_wrap(~treatment)
-#p
-
 #select one daughter at each generation
 single_daughter_data <- df_input %>%
   mutate(key = paste0(well, "_",field, "_", lineage)) %>%
@@ -329,25 +276,19 @@ p <- ggplot(df, aes(x = tmin, y = key)) +
 p
 
 p <- ggplot(df, aes(x_rel, y_rel, colour = factor(lineage))) +
-  #geom_point(size = .1, alpha = .8) +
   geom_path(size = .4, alpha = .8) +
   scale_colour_manual(values = cols) +
-  #coord_cartesian(xlim = c(-900, 900), ylim = c(-900, 900)) +
   guides(colour = FALSE) +
   labs(title = "Relative motion of equal number of lineages")+
   theme_bw()+
   theme(strip.text = element_text(size = 12),
         strip.background = element_rect(fill = "transparent"),
         axis.title = element_blank(),
-       # axis.text = element_blank(),
-        #axis.ticks = element_blank(),
-        #panel.border = element_blank(),
         panel.grid.major = element_blank(),
         panel.grid.minor = element_blank(),
         axis.line =element_blank()) +
-  facet_wrap(~treatment)
+  facet_wrap(~treatment, ncol = 4)
 p
-
 
 if(create_pdfs){
   pdf("MDD_migration_relative_tracks.pdf", useDingbats = FALSE, width = 8, height = 5)
@@ -356,53 +297,5 @@ if(create_pdfs){
 }
 
 
-p <- ggplot(df, aes(x_rel, y_rel, colour = factor(generation))) +
-  #geom_point(size = .1, alpha = .8) +
-  geom_path(size = .4, alpha = .8) +
-  scale_colour_manual(values = cols) +
-  #coord_cartesian(xlim = c(-900, 900), ylim = c(-900, 900)) +
-  #guides(colour = FALSE) +
-  labs(title = "Relative motion of equal number of lineages, one daughter",
-       subtitle = "colored by generation")+
-  theme_bw()+
-  theme(strip.text = element_text(size = 12),
-        strip.background = element_rect(fill = "transparent"),
-        axis.title = element_blank(),
-       #axis.text = element_blank(),
-        #axis.ticks = element_blank(),
-        #panel.border = element_blank(),
-        panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank(),
-        axis.line =element_blank()) +
-  facet_wrap(~treatment)
-#p
 ```
 
-
-```{r plot_lineages, fig.width=6, fig.height=8}
-
-p <- ggplot(df_input, aes(xpixel, ypixel, colour = factor(lineage))) +
-  geom_point(size = .1, alpha = .6) +
-  guides(colour = FALSE) +
-  labs(title = "Colored by lineage") +
-  theme_bw()+
-   theme(strip.text = element_text(size = 5, margin = margin()),
-        strip.background = element_rect(fill = "transparent")) +
- facet_wrap(~well+field+treatment)
-#p
-
-```
-
-```{r plot_generations, fig.width=7, fig.height=8}
-
-
-p <- ggplot(df_input, aes(xpixel, ypixel, colour = factor(generation))) +
-  geom_point(size = .1, alpha = .8) +
-  labs(title = "Colored by generation",
-       colour = "Generation") +
-  theme_bw()+
-   theme(strip.text = element_text(size = 5, margin = margin()),
-        strip.background = element_rect(fill = "transparent")) +
- facet_wrap(~well+field+treatment)
-#p
-```
