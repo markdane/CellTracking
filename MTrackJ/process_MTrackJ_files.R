@@ -5,10 +5,10 @@ library(rmarkdown)
 #assume there is a subfolder named Data that contains data files
 #with plateID_well alphanumeric_field_intensities.csv files
 
-process_files <- function(path){
+process_files <- function(path, plateID = NULL){
   out_filename <- str_replace(path,"Points","intensities")
   
-  if(!dir.exists("Reports")) dir.create("Reports")
+  if(!dir.exists(paste0(here(),"/MTrackJ/",plateID, "/Reports"))) dir.create(paste0(here(),"/MTrackJ/",plateID, "/Reports"))
   
   report_name <- str_replace(path, "Data","Reports") %>%
     str_replace("_Points.csv",".html")
@@ -19,6 +19,7 @@ process_files <- function(path){
          output_options = list(code_folding = "hide"))
 }
  
-res <- dir("MTrackJ/Data", pattern = "Points.csv", full.names = TRUE) %>%
+plateID <- "LI204701"
+res <- dir(paste0("MTrackJ/",plateID,"/Data"), pattern = "Points.csv", full.names = TRUE) %>%
   here() %>%
-  map(process_files)
+  map(process_files, plateID = plateID)
