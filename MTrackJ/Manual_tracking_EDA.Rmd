@@ -8,13 +8,17 @@ library(RColorBrewer)
 library(DT)
 
 ###debug to run standalone from calling script
-#path <- "/Users/dane/Documents/CellTracking/MTrackJ/Data/LI802303_A02_X_2_Points.csv"
+#path <- "/Users/dane/Documents/CellTracking/MTrackJ/Data/LI802303_A04_B8_2_Points.csv"
+#path <- "/Users/dane/Documents/CellTracking/MTrackJ/Data/LI802303_A02_2_Points.csv"
+#out_filename <- str_replace(path,"Points","intensities")
+
 tmin_period = 30
+
 ```
 
 ```{r}
 
-df_input_raw <- read_csv(paste0(path), col_types = cols(
+df_input_raw <- read_csv(path, col_types = cols(
   Nr = col_double(),
   TID = col_double(),
   PID = col_double(),
@@ -39,9 +43,10 @@ metadata <- str_extract(path, ".*/") %>%
   readxl::read_xlsx()
 
 #get well name and treatement for this data
+###DEBUG fix field name extraction for names without wells
 wellName <- str_extract(path, "[AB]0[1234]")
-fieldName <- str_extract(path, "[AB]0[1234].*_Points") %>%
-  str_remove_all("[AB]0[1234]_|_Points")
+fieldName <- str_extract(path, "_.*") %>%
+  str_remove_all("_[AB]0[1234]_|_Points.csv")
 
 treatment <- metadata %>%
   filter(well == wellName) %>%
@@ -53,8 +58,14 @@ QA_trackIDs <- function(x){
   return(res)
 }
 
+fix_PID <- function(x) {
+  x_fixed <- x - min(x) + 1
+  return(x_fixed)
+}
+
 PID_QA <- df_input_raw %>%
   group_by(TID) %>%
+  mutate(PID = fix_PID(PID)) %>%
   summarize(QA_pass = QA_trackIDs(PID)) %>%
   ungroup() %>%
   filter(QA_pass) %>%
@@ -65,7 +76,6 @@ df_input <- df_input_raw %>%
   mutate(well = wellName,
          field = fieldName,
          treatment = treatment)
-
 ```
 
 Extract the intensity values into a full matrix with cell number as the column names and time as the row names. Write these values to a file named `r out_filename` with empty strings in place of the missing data.  
@@ -198,7 +208,7 @@ tracks_last_time <- new_tracks %>%
   left_join(df_input, by = c("motherID" = "TID", "tmin" = "tmin")) %>%
   select(tmin, motherID, xpixel, ypixel)
 
-position_threshold <- 75
+position_threshold <-905
 time_threshold <- 30
 
 #get mother IDs for tracks that start after time 0
@@ -340,7 +350,7 @@ df <- df_lineage_raw %>%
   mutate(distance = calc_distance(xpixel, ypixel)) %>%
   summarise(distance_mean = mean(distance),
             distance_total = sum(distance),
-            average_speed = distance_mean/tmin_period) %>%
+            average_velocity = 60*distance_mean/tmin_period) %>%
   ungroup() %>%
   right_join(df_lineage_raw, by = "TID") %>%
   group_by(TID) %>%
@@ -349,7 +359,13 @@ df <- df_lineage_raw %>%
 
 #write out tracks that didn't get assoicated with a mother
 orphans <- df %>%
-  filter(is.na(motherID))
+  filter(is.na(motherID)) %>%
+  group_by(TID) %>%
+  slice_head(n = 1) %>%
+  ungroup() %>%
+  select(tmin, TID, xpixel, ypixel, PID, Ival) %>%
+  mutate(well = wellName,
+         field = fieldName)
 
 df_lineage <- df %>%
   filter(!is.na(motherID))
@@ -427,7 +443,7 @@ calc_distance <- function(x,y){
   return(res)
 }
 df <- df_lineage %>%
-  select(TID, distance_mean, distance_total, average_speed, treatment,generation, lineage) %>%
+  select(TID, distance_mean, distance_total, average_velocity, treatment,generation, lineage) %>%
   distinct()
   
 p <- ggplot(df, aes(x = TID, y = distance_mean,fill = factor(lineage))) +
@@ -435,7 +451,7 @@ p <- ggplot(df, aes(x = TID, y = distance_mean,fill = factor(lineage))) +
   guides(fill = FALSE)
 p
 
-p <- ggplot(df, aes(x = TID, y = average_speed,fill = factor(lineage))) +
+p <- ggplot(df, aes(x = TID, y = average_velocity,fill = factor(lineage))) +
   geom_col() +
   guides(fill = FALSE)
 p
