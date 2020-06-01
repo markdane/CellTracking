@@ -8,11 +8,11 @@ library(RColorBrewer)
 library(DT)
 
 ###debug to run standalone from calling script
-#path <- "/Users/dane/Documents/CellTracking/MTrackJ/Data/LI802303_A04_B8_2_Points.csv"
+path <- "/Users/dane/Documents/CellTracking/MTrackJ/LI802303/Data/LI802303_A04_B8_2_Points.csv"
 #path <- "/Users/dane/Documents/CellTracking/MTrackJ/Data/LI802303_A02_2_Points.csv"
-#out_filename <- str_replace(path,"Points","intensities")
+out_filename <- str_replace(path,"Points","intensities")
 
-tmin_period = 30
+
 
 ```
 
@@ -37,6 +37,28 @@ df_input_raw <- read_csv(path, col_types = cols(
 
 colnames(df_input_raw) <- str_replace_all(colnames(df_input_raw),"[ [:punct:][:blank:]]" ,"")
 
+#####QA fix for manula tracking error
+if(str_detect(path, "LI802303_A04_B8_2")){
+  TID_9 <- df_input_raw %>%
+    filter(TID == 9) %>%
+    arrange(tmin) %>%
+    mutate(PID = 1:n())
+  
+  df_input_raw <- df_input_raw %>%
+    filter(!TID == 9) %>%
+    bind_rows(TID_9)
+}
+
+
+####
+#calculate t min period from the data
+# Create getmode function.
+getmode <- function(v) {
+   uniqv <- unique(v)
+   uniqv[which.max(tabulate(match(v, uniqv)))]
+}
+tmin_period = getmode(diff(df_input_raw$tmin))
+
 #get metadata for the plate
 metadata <- str_extract(path, ".*/") %>%
   dir(pattern = "metadata", full.names = TRUE) %>%
@@ -44,9 +66,9 @@ metadata <- str_extract(path, ".*/") %>%
 
 #get well name and treatement for this data
 ###DEBUG fix field name extraction for names without wells
-wellName <- str_extract(path, "[AB]0[1234]")
+wellName <- str_extract(path, "[ABCD][0]?[:digit:]")
 fieldName <- str_extract(path, "_.*") %>%
-  str_remove_all("_[AB]0[1234]_|_Points.csv")
+  str_remove_all("_[ABCD][0]?[:digit:]_|_Points.csv")
 
 treatment <- metadata %>%
   filter(well == wellName) %>%
