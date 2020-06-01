@@ -19,7 +19,18 @@ process_files <- function(path, plateID = NULL){
          output_options = list(code_folding = "hide"))
 }
  
-plateID <- "LI204701"
+#plateID <- "LI204701"
+plateID <- "LI802303"
+
 res <- dir(paste0("MTrackJ/",plateID,"/Data"), pattern = "Points.csv", full.names = TRUE) %>%
   here() %>%
   map(process_files, plateID = plateID)
+
+render_summary_report <- function(plateID){
+  report_name <- paste0(here(),"/MTrackJ/",plateID, "_tracking_summary.html")
+  render("MTrackJ/Manual_tracking_summary.Rmd",
+         output_file = report_name,
+         output_format = "html_document",
+         output_options = list(code_folding = "hide"))
+}
+render_summary_report(plateID)
