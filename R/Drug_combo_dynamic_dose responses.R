@@ -83,9 +83,8 @@ plot_data <- function(cell_cycle_data, exclude_combo = TRUE){
       filter(!treatment == "combo")
     df_combo <- df  %>%
       filter(treatment == "combo")
-    p <- ggplot(df_no_combo, aes(x=time, y=counts, color=treatment, label = treatment)) + 
+    p <- ggplot(df_no_combo, aes(x=time, y=counts, color=treatment)) + 
       geom_line(size=.7, alpha = .5) +
-      geom_text() +
       shadow_mark(past = TRUE, future = TRUE, exclude_layer = c(2,5)) +
       scale_x_continuous(breaks = c(0,24,48, 72, 96)) +
       scale_color_manual(values = treatment_colors) +
@@ -99,7 +98,6 @@ plot_data <- function(cell_cycle_data, exclude_combo = TRUE){
             legend.position="none"
       )
     cell_plot <- p + geom_line(data = df_combo, size=2, alpha = 1) +
-      geom_label(data = df_combo, aes(label = treatment)) +
       transition_reveal(time) 
     
   }
@@ -170,7 +168,7 @@ plot_data <- function(cell_cycle_data, exclude_combo = TRUE){
 }
 
 #animate the plots
-animate_plots <- function(cell_cycle_plot){
+animate_plots <- function(cell_cycle_plot, combo_name){
   nframes <- length(unique(cell_cycle_plot$cell$data$time))
   panel_a <- animate(cell_cycle_plot$cell, nframes, height = 500, renderer = magick_renderer())
   panel_b <- animate(cell_cycle_plot$cycle, nframes, height = 500, renderer = magick_renderer())
@@ -182,7 +180,11 @@ animate_plots <- function(cell_cycle_plot){
     full_gif <- c(full_gif, next_frame)
   }
   #Save the combined GIF
-  image_write_gif(full_gif, paste0("../plots/",names(cell_cycle_plot),"_combined.gif"))
+  if(cell_cycle_plot$cell$plot_env[["exclude_combo"]]){
+    image_write_gif(full_gif, paste0("../plots/",combo_name,"_no_combo.gif"))
+  } else {
+    image_write_gif(full_gif, paste0("../plots/",combo_name,"_dynamic_combo.gif"))
+  }
 }
 
 #end of functions###
@@ -198,12 +200,12 @@ cell_cycle_data <- map(combo_names, read_process_data)
 cell_cycle_plots <- map(cell_cycle_data, plot_data, exclude_combo = FALSE)
 
 #animate the plots
-res <- map(cell_cycle_plots, animate_plots)
+res <- imap(cell_cycle_plots, animate_plots)
 
 #Do a version with the combinations
 cell_cycle_plots <- map(cell_cycle_data, plot_data, exclude_combo = TRUE)
 
 #animate the plots
-res <- map(cell_cycle_plots, animate_plots)
+res <- imap(cell_cycle_plots, animate_plots)
 
 
