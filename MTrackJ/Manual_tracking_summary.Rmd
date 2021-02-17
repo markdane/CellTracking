@@ -28,7 +28,7 @@ ligand_cols <- c("CTRL" = "#7A4A2A",
                   "TGFB" = "#0000ff"
                  )
 
-create_pdfs <- TRUE
+create_pdfs <- FALSE
 
 tmin_period = 30
 ###DEBUG
@@ -483,10 +483,12 @@ df <- single_cell_lineage_T0_rel %>%
   select(thour, lineage_length_mean, treatment) %>%
   distinct() %>%
   arrange(thour)
+#Save this summary data to add to the integrated analysis
+res <- write_csv(df, "MDD_migration_distance_lineage_T0.csv")
 
 p <- ggplot(single_cell_lineage_T0_rel, aes(x = thour, y = lineage_length,  group = lineage_key, colour = factor(lineage_col))) +
-  geom_point(data = mitotic_events, size = .6, alpha = .8) +
-  geom_path(size = .6, alpha = .8) +
+  geom_point(data = mitotic_events, size = .3, alpha = .8) +
+  geom_path(size = .4, alpha = .8) +
   scale_x_continuous(breaks = c(0,12,24, 36, 48)) +
   scale_color_brewer(palette = "Paired") +
     labs(title = "Distance traveled by lineage",
@@ -503,11 +505,11 @@ p <- ggplot(single_cell_lineage_T0_rel, aes(x = thour, y = lineage_length,  grou
         axis.line = element_line()) +
   facet_wrap(~treatment, nrow = 1)
 #p <- p + 
-p <- p + geom_path(data = df, aes(x = thour, y = lineage_length_mean), color = "black", group = 1, alpha = .8, size = 1)
+p <- p + geom_path(data = df, aes(x = thour, y = lineage_length_mean), color = "black", group = 1, alpha = .8, size = .8)
 p
 
 if(create_pdfs){
-  pdf("MDD_migration_distance.pdf", useDingbats = FALSE, width = 8, height = 2)
+  pdf("MDD_migration_distance_size_pt4.pdf", useDingbats = FALSE, width = 8, height = 2)
   print(p)
   res <- dev.off()
 }
