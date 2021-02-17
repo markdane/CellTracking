@@ -7,6 +7,7 @@ library(tidyverse)
 library(gganimate)
 library(magick)
 library(readxl)
+library(gridExtra)
 
 #functions####
 
@@ -170,8 +171,8 @@ plot_data <- function(cell_cycle_data, exclude_combo = TRUE){
 #animate the plots
 animate_plots <- function(cell_cycle_plot, combo_name){
   nframes <- length(unique(cell_cycle_plot$cell$data$time))
-  panel_a <- animate(cell_cycle_plot$cell, nframes, height = 500, renderer = magick_renderer())
-  panel_b <- animate(cell_cycle_plot$cycle, nframes, height = 500, renderer = magick_renderer())
+  panel_a <- animate(cell_cycle_plot$cell, nframes, height = 500, width = 500, renderer = magick_renderer())
+  panel_b <- animate(cell_cycle_plot$cycle, nframes, height = 500, width = 610, renderer = magick_renderer())
   
   #Create first frame then add the rest
   full_gif <- image_append(c(panel_a[1], panel_b[1]))
