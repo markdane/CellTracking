@@ -1,5 +1,5 @@
 ---
-title: "MCF10A ligand cmbinations"
+title: "MCF10A ligand combinations"
 output: 
   html_document:
   code_folding: hide
@@ -16,7 +16,7 @@ library(RColorBrewer)
 
 ```{r get_data, echo=FALSE, message=FALSE, warning=FALSE, include=FALSE}
 
-raw_data <- dir("tables", pattern = "_level_0",full.names = TRUE) %>%
+raw_data <- dir("data", pattern = "_level_0",full.names = TRUE) %>%
   map(read_csv, progress = FALSE,
       col_types = cols(
   X1 = col_double(),
@@ -49,7 +49,7 @@ raw_data <- dir("tables", pattern = "_level_0",full.names = TRUE) %>%
          minute = str_remove(minute, "m"),
          minute = as.integer(minute),
          elapsed_minutes = day*24*60+hour*60+minute) %>%
-  filter(!elapsed_minutes %in% c(45, 150, 810, 1050, 1185, 1575, 2100))
+  filter(!elapsed_minutes %in% c(45, 150, 810, 1050, 1185, 1575, 2100, 2865))
 
 ```
 
@@ -89,6 +89,7 @@ p_n_t <- ggplot(field_data, aes(x = elapsed_minutes, y = n, color = treatment, g
   labs(title = "Cell counts for each treatment",
        xlab ="minutes",
        ylab = "cell count") +
+  coord_cartesian(ylim = c(0,800)) +
   facet_wrap(~treatment, ncol = 2)
 p_n_t
 
@@ -108,7 +109,6 @@ p_CC <- ggplot(field_data, aes(x = elapsed_minutes, y = Nuclei_CL_CC_mean_intens
   facet_wrap(~well, ncol = 2)
 p_CC
 
-
 p_CC_t <- ggplot(field_data, aes(x = elapsed_minutes, y = Nuclei_CL_CC_mean_intensity, color = treatment, group = interaction(field, well))) +
   geom_path() +
    labs(title = "Cell cycle intensity in the nuclei, mean",
@@ -117,7 +117,7 @@ p_CC_t <- ggplot(field_data, aes(x = elapsed_minutes, y = Nuclei_CL_CC_mean_inte
   facet_wrap(~treatment, ncol = 2)
 p_CC_t
 
-pdf("LI204601_cell_counts_intensities.pdf")
+pdf("plots/LI204601_cell_counts_intensities.pdf")
 p_n
 p_n_t
 p_CC
