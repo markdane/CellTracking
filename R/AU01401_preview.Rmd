@@ -1,0 +1,425 @@
+---
+title: "AU565 drug combination responses"
+output: 
+  html_document:
+  code_folding: hide
+---
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = FALSE)
+
+library(tidyverse)
+library(RColorBrewer)
+library(readxl)
+library(umap)
+library(ComplexHeatmap)
+library(circlize)
+
+```
+
+
+```{r get_data, cache=FALSE}
+plateID <- "AU01401"
+if(!file.exists(paste0("../data/",plateID,"_level_1.csv"))){
+  raw_data <- dir("../data", pattern = plateID,full.names = TRUE)[1:4] %>%
+  map(read_csv, progress = FALSE
+  
+  ,
+      col_types = cols(
+  X1 = col_double(),
+  label = col_double(),
+  Nuclei_CL_NR_area = col_double(),
+  Nuclei_CL_NR_eccentricity = col_double(),
+  Nuclei_CL_NR_mean_intensity = col_double(),
+  Nuclei_CL_NR_max_intensity = col_double(),
+  Nuclei_CL_NR_min_intensity = col_double(),
+  Nuclei_CL_NR_feret_diameter_max = col_double(),
+  Nuclei_CL_NR_solidity = col_double(),
+  well = col_character(),
+  field = col_double(),
+  time = col_character(),
+  label_1 = col_double(),
+  Nuclei_CL_CC_mean_intensity = col_double(),
+  Nuclei_CL_CC_max_intensity = col_double(),
+  Nuclei_CL_CC_min_intensity = col_double()
+)) %>%
+  bind_rows() %>%
+  mutate(well_col = str_remove(well, "[A-Z]"),
+         well_col = as.integer(well_col),
+         well = sprintf("%.1s%02.2d", well, well_col),
+         day = str_remove(time, "d.*"),
+         day = as.integer(day),
+         hour = str_extract(time, "[0-9]*h"),
+         hour = str_remove(hour, "h"),
+         hour = as.integer(hour),
+         minute = str_extract(time, "[0-9]*m"),
+         minute = str_remove(minute, "m"),
+         minute = as.integer(minute),
+         elapsed_minutes = day*24*60+hour*60+minute) %>%
+  filter(!elapsed_minutes %in% c()) %>%
+  drop_na()
+  
+  treatment_levels = c("vehicle", 
+                      "5FU_125", "5FU_250", "5FU_400", "5FU_550", "5FU_750", "5FU_1000", "5FU_2500",
+                      "AZD5438_50", "AZD5438_100", "AZD5438_250", "AZD5438_500", "AZD5438_1000", "AZD5438_2500", "AZD5438_5000",
+                      "Panobinostat.5","Panobinostat_1", "Panobinostat_2.5", "Panobinostat_5", "Panobinostat_6.5",  "Panobinostat_10", "Panobinostat_12.5")
+
+
+  metadata <- dir(path = "../metadata/", pattern = paste0(plateID,".xlsx"), full.names = TRUE)  %>%
+  map(readxl::read_excel) %>%
+  bind_rows() %>%
+  mutate(ligand = paste(Ligand1, Ligand2, Ligand3, sep = "_"),
+         ligand = str_remove_all(ligand, "_none"),
+         drugs =  paste(Drug1 ,Drug2, sep = "_"),
+         drugs = str_remove_all(drugs, "_none|_0"),
+         treatment =  paste(Drug1, Drug1Concentration,Drug2, Drug2Concentration, sep = "_"),
+         treatment = str_remove_all(treatment, "_none|_0"),
+         treatment = factor(treatment, levels = treatment_levels,ordered = TRUE)) %>%
+  distinct()
+
+data_ann <- raw_data %>%
+  left_join(metadata, by = c("well" = "Well")) 
+
+field_data <- data_ann %>%
+  group_by(well, field, elapsed_minutes, treatment, drugs, Drug1,
+           Drug1Concentration, Drug2, Drug2Concentration) %>%
+  summarise(n = n(),
+            Nuclei_CL_NR_mean_intensity = mean(Nuclei_CL_NR_mean_intensity),
+            Nuclei_CL_CC_mean_intensity=mean(Nuclei_CL_CC_mean_intensity),
+            Cyto_CL_CC_mean_intensity=mean(Cyto_CL_CC_mean_intensity),
+            Cell_CL_CC_mean_intensity_ratio=mean(Cell_CL_CC_mean_intensity_ratio),
+            Cell_CL_CC_max_intensity_ratio=mean(Cell_CL_CC_max_intensity_ratio),
+            Cell_CL_CC_min_intensity_ratio=mean(Cell_CL_CC_min_intensity_ratio),
+            .groups = "drop")
+
+field_data <- field_data %>%
+  filter(elapsed_minutes == 120) %>%
+  rename(n_120 = n) %>%
+  select("well", "field", "n_120") %>%
+  right_join(field_data,by = c("well", "field")) %>%
+  mutate(cell_count_norm_T120 = n/n_120)
+
+write_csv(field_data,paste0("../data/",plateID,"_level_1.csv"))
+
+} else {
+  field_data <- read_csv(paste0("../data/",plateID,"_level_1.csv"))
+}
+
+
+```
+
+```{r qa_check, fig.height=20}
+# 
+# p_area <- ggplot(data_ann, aes(x = Nuclei_CL_NR_area, fill = factor(field))) +
+#   geom_density(alpha = .3) +
+#   coord_cartesian(xlim = c(125,600))+
+#   labs(title = "Cell area density in each field",
+#        xlab ="area") +
+#   theme_bw()+
+#   facet_grid(well~field)
+# p_area
+
+```
+
+```{r identify_debris}
+sample_image_data <- read_csv("../data/AU01401_C2_4_162_data.csv") %>%
+  mutate(label = as.character(label)) %>%
+  janitor::clean_names(case = 'none')
+
+#Select features for dimension reduction
+selected_features <- colnames(sample_image_data) %>%
+  str_remove(".*bbox.*|.*label.*|.*centroid.*|X1|.*area.*") %>%
+  stringi::stri_remove_empty_na() %>%
+  unique()
+
+sample_image_data_values <- sample_image_data %>%
+  select(all_of(selected_features))
+  
+sample_image_data_values_dm <- sample_image_data_values %>%
+  as.matrix()
+rownames(sample_image_data_values_dm) <- sample_image_data$label
+
+cell_umap_df <- umap(sample_image_data_values_dm)$layout %>%
+  as_tibble(rownames = "label")
+
+sample_image_data_dr <- sample_image_data %>%
+  left_join(cell_umap_df, by = "label") %>%
+  rename("UMAP_1" = "V1",
+         "UMAP_2" = "V2")
+
+```
+
+
+```{r display_dimension_reduction}
+pdf("../plots/AU01401_C2_4_162_umaps.pdf")
+p_umap <- ggplot(sample_image_data_dr, aes(x = UMAP_1, y = UMAP_2, color = Nuclei_CL_phase_intensity_std)) +
+  geom_point() +
+  theme_bw()
+p_umap
+
+p_umap <- ggplot(sample_image_data_dr, aes(x = UMAP_1, y = UMAP_2, color = Nuclei_CL_phase_max_intensity)) +
+  geom_point() +
+  theme_bw()
+p_umap
+
+
+p_umap <- ggplot(sample_image_data_dr, aes(x = UMAP_1, y = UMAP_2, color = Nuclei_CL_phase_min_intensity)) +
+  geom_point() +
+  theme_bw()
+p_umap
+
+p_umap <- ggplot(sample_image_data_dr, aes(x = UMAP_1, y = UMAP_2, color = Nuclei_CL_phase_mean_intensity)) +
+  geom_point() +
+  theme_bw()
+p_umap
+
+p_umap <- ggplot(sample_image_data_dr, aes(x = UMAP_1, y = UMAP_2, color = Nuclei_CL_NR_area)) +
+  geom_point() +
+  theme_bw()
+p_umap
+
+p_umap <- ggplot(sample_image_data_dr, aes(x = UMAP_1, y = UMAP_2, color = log10(Nuclei_CL_NR_min_intensity))) +
+  geom_point() +
+  theme_bw()
+p_umap
+
+p_umap <- ggplot(sample_image_data_dr, aes(x = UMAP_1, y = UMAP_2, color = Nuclei_CL_NR_max_intensity)) +
+  geom_point() +
+  theme_bw()
+p_umap
+
+
+p_umap <- ggplot(sample_image_data_dr, aes(x = UMAP_1, y = UMAP_2, color = Nuclei_CL_NR_eccentricity)) +
+  geom_point() +
+  theme_bw()
+p_umap
+
+```
+
+```{r single_cell_heatmap}
+pdf("../plots/AU01401_C2_4_162_heatmap.pdf")
+heatmap_dm <- sample_image_data_values %>%
+  mutate(across(.fns = scale)) %>%
+  as.matrix
+rownames(heatmap_dm) <- sample_image_data$label
+
+clust_obj <- hclust(dist(heatmap_dm))
+clusters <- cutree(clust_obj, k = 3)
+  
+# cor_dm <- cor(t(combined18_features_data_mean_dm),  method = "pearson")
+# hr = hclust(dist(cor_dm))
+# clusters = dendextend::cutree(hr, k = 14)
+
+hm <- Heatmap(heatmap_dm,
+              row_names_gp = gpar(fontsize = 4),
+                split = clusters)
+hm
+```
+
+`
+```{r features}
+pdf("../plots/AU01401_C2_4_162_biplots.pdf")
+
+df <- sample_image_data %>%
+  mutate(cluster = clusters)
+  
+p <- ggplot(sample_image_data, aes(x = Nuclei_CL_phase_intensity_std)) +
+  geom_histogram(binwidth = .5)
+p
+
+p <- ggplot(sample_image_data, aes(x = Nuclei_CL_phase_intensity_std)) +
+  geom_density()
+p
+
+p <- ggplot(sample_image_data, aes(x = Nuclei_CL_phase_max_intensity)) +
+  geom_density()
+p
+
+p <- ggplot(sample_image_data, aes(x = Nuclei_CL_phase_measure_shannon_entropy)) +
+  geom_density()
+p
+
+p <- ggplot(sample_image_data, aes(x = Nuclei_CL_phase_intensity_std, y = log10(Nuclei_CL_phase_mean_intensity))) +
+  geom_point(alpha = .7)
+p
+
+
+p <- ggplot(df, aes(x = Nuclei_CL_phase_intensity_std, y = Nuclei_CL_phase_measure_shannon_entropy, color = factor(cluster))) +
+  geom_point(alpha = .7)
+p
+
+
+p <- ggplot(df, aes(x = Nuclei_CL_phase_intensity_std, y = Nuclei_CL_phase_max_intensity)) +
+  geom_density_2d() +
+  geom_point(aes(color = factor(cluster)), size = .8) +
+  theme_bw()
+p
+
+p <- ggplot(df, aes(x = Nuclei_CL_phase_intensity_std, y = log10(Nuclei_CL_phase_mean_intensity), color = factor(cluster))) +
+  geom_point(alpha = .7)
+p
+
+res <- dev.off()
+```
+perform a quick check on four fields from each well.
+
+```{r visualize_data, fig.width= 10, fig.height=14}
+
+p_n <- ggplot(field_data, aes(x = elapsed_minutes, y = n, color = factor(field))) +
+  geom_path() +
+  labs(title = "Cell counts in each field",
+       xlab ="minutes",
+       ylab = "cell count") +
+  facet_wrap(~well, ncol = 6)
+p_n
+
+
+p_n_t <- ggplot(field_data, aes(x = elapsed_minutes, y = n, color = treatment, group = interaction(field, well))) +
+  geom_path() +
+  labs(title = "Cell counts for each treatment",
+       xlab ="minutes",
+       ylab = "cell count") +
+  guides(color = guide_legend(ncol = 1)) +
+  facet_wrap(~treatment, ncol = 6)+
+  theme(strip.text = element_text(size = 5))
+p_n_t
+
+p_n_T120 <- ggplot(field_data, aes(x = elapsed_minutes, y = cell_count_norm_T120, color = factor(field))) +
+  geom_path() +
+  labs(title = "Cell counts in each field (T120 normed)",
+       xlab ="minutes",
+       ylab = "cell count") +
+  facet_wrap(~well, ncol = 6)
+p_n_T120
+
+
+p_n_t_T120 <- ggplot(field_data, aes(x = elapsed_minutes, y = cell_count_norm_T120, color = treatment, group = interaction(field, well))) +
+  geom_path() +
+  labs(title = "Cell counts for each treatment (T120 normed)",
+       xlab ="minutes",
+       ylab = "cell count") +
+  guides(color = guide_legend(ncol = 1)) +
+  facet_wrap(~treatment, ncol = 6)+
+  theme(strip.text = element_text(size = 5))
+p_n_t_T120
+
+p_NR <- ggplot(field_data, aes(x = elapsed_minutes, y = Nuclei_CL_NR_mean_intensity, color = factor(field))) +
+  geom_path() +
+  labs(title = "Nuclear reporter intensity, mean",
+       xlab = "minutes",
+       ylab = "intensity") +
+  facet_wrap(~well, ncol = 2)
+p_NR
+
+p_CC <- ggplot(field_data, aes(x = elapsed_minutes, y = Nuclei_CL_CC_mean_intensity, color = factor(field))) +
+  geom_path() +
+   labs(title = "Cell cycle intensity in the nuclei, mean",
+       xlab = "minutes",
+       ylab = "intensity") +
+  facet_wrap(~well, ncol = 6)
+p_CC
+
+p_CC_t <- ggplot(field_data, aes(x = elapsed_minutes, y = Nuclei_CL_CC_mean_intensity, color = treatment, group = interaction(field, well))) +
+  geom_path() +
+   labs(title = "Cell cycle intensity in the nuclei, mean",
+       xlab = "minutes",
+       ylab = "intensity") +
+    guides(color = guide_legend(ncol = 1)) +
+  facet_wrap(~treatment, ncol = 2)
+p_CC_t
+
+
+p_cyto_CC <- ggplot(field_data, aes(x = elapsed_minutes, y = Cyto_CL_CC_mean_intensity, color = factor(field))) +
+  geom_path() +
+   labs(title = "Cell cycle intensity in the cytoplasm, mean",
+       xlab = "minutes",
+       ylab = "intensity") +
+  facet_wrap(~well, ncol = 6)
+p_cyto_CC
+
+p_cyto_CC_t <- ggplot(field_data, aes(x = elapsed_minutes, y = Cyto_CL_CC_mean_intensity, color = treatment, group = interaction(field, well))) +
+  geom_path() +
+   labs(title = "Cell cycle intensity in the cytoplasm, mean",
+       xlab = "minutes",
+       ylab = "intensity") +
+      guides(color = guide_legend(ncol = 1)) +
+  facet_wrap(~treatment, ncol = 6)+
+  theme(strip.text = element_text(size = 5))
+p_cyto_CC_t
+
+p_cyto_CC_ratio <- ggplot(field_data, aes(x = elapsed_minutes, y = Cell_CL_CC_mean_intensity_ratio, color = factor(field))) +
+  geom_path() +
+   labs(title = "Cell cycle intensity in the cytoplasm/nuclei, mean",
+       xlab = "minutes",
+       ylab = "intensity") +
+  facet_wrap(~well, ncol = 2)
+p_cyto_CC_ratio
+
+p_cyto_CC_t_ratio <- ggplot(field_data, aes(x = elapsed_minutes, y = Cell_CL_CC_mean_intensity_ratio, color = treatment, group = interaction(field, well))) +
+  geom_path() +
+   labs(title = "Cell cycle intensity in the cytoplasm/nuclei, mean",
+       xlab = "minutes",
+       ylab = "intensity") +
+    guides(color = guide_legend(ncol = 1)) +
+  facet_wrap(~treatment, ncol = 2)
+p_cyto_CC_t_ratio
+
+# p_n_ds <- ggplot(field_data, aes(x = elapsed_minutes, y = n, color = interaction(Drug1Concentration, Drug2Concentration), group = drugs)) +
+#   geom_path() +
+#   labs(title = "Cell counts for each treatment",
+#        xlab ="minutes",
+#        ylab = "cell count") +
+#   guides(color = guide_legend(ncol = 1)) +
+#   facet_wrap(~drugs, ncol = 6)+
+#   theme(strip.text = element_text(size = 5))
+# p_n_ds
+
+pdf("../plots/AU565_drug_dose_response_cell_counts_intensities.pdf", width = 10, height = 14)
+p_n
+p_n_t
+p_n_T120
+p_n_t_T120
+p_CC
+p_CC_t
+p_NR
+p_cyto_CC
+p_cyto_CC_t
+p_cyto_CC_ratio
+p_cyto_CC_t_ratio
+res <- dev.off()
+
+```
+
+```{r compare_to_CP, fig.height=20, eval = FALSE}
+
+AU01101_CP <- map_dfr(dir(path = "../CP_data", full.names = TRUE), read_excel) %>%
+  mutate(well_column = str_remove(Metadata_Well, "[A-Z]") %>%
+           sprintf("%02s", .),
+         well_row = str_remove(Metadata_Well, "[[:digit:]*]"),
+         Metadata_Well = paste0(well_row, well_column),
+         Time_slice_index = (ImageNumber-1)%% 193+1,
+         elapsed_minutes = (Time_slice_index-1)*30+3) %>%
+  select(Metadata_Well, Metadata_Site, Count_Nuclei, Time_slice_index,elapsed_minutes)
+
+
+field_data_CL_CP <- field_data %>%
+  right_join(AU01101_CP, by = c("well"= "Metadata_Well", "field" = "Metadata_Site", "elapsed_minutes" = "elapsed_minutes")) 
+
+cell_counts_CL_CP <- field_data_CL_CP %>%
+  select(well, field, n, Count_Nuclei, elapsed_minutes) %>%
+  pivot_longer(cols = c(n, Count_Nuclei), names_to = "pipeline", values_to = "Cell_count") %>%
+  mutate(pipeline = case_when(pipeline =="n" ~"Cellpose",
+                             pipeline == "Count_Nuclei" ~"CellProfiler"))
+
+p_CL_CP <- ggplot(cell_counts_CL_CP, aes(x = elapsed_minutes, y = Cell_count, color = pipeline)) +
+  geom_point(size = .5, alpha = .8) +
+  theme_bw()+
+  facet_grid(well~field, scales = "free_y")
+p_CL_CP
+
+pdf("../plots/AU01101_cell_count_pipeline_comparison.pdf", height = 14)
+print(p_CL_CP)
+res <- dev.off()
+
+```
