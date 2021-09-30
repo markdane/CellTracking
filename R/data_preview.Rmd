@@ -1,0 +1,320 @@
+---
+title: "AU565 drug combination responses"
+output: 
+  html_document:
+  code_folding: hide
+---
+
+```{r setup, include=FALSE, cache=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+
+library(tidyverse)
+library(RColorBrewer)
+library(readxl)
+
+```
+
+
+```{r get_data}
+plateID <- "AU01101"
+data_path <- "/home/exacloud/gscratch/HeiserLab/images/"
+pipeline_name <- "PI"
+
+create_level_2_data <- function(plateID, data_path = "/home/exacloud/gscratch/HeiserLab/images/", pipeline_name = "PI"){
+  
+  level_1_data_path <- paste0(data_path,plateID,"/Analysis/",pipeline_name,"/",plateID,"_level_1.csv")
+  level_2_data_path <- paste0(data_path,plateID,"/Analysis/",pipeline_name,"/",plateID,"_level_2.csv")
+
+  if(!file.exists(level_1_data_path)){
+    treatment_levels = c("vehicle",
+                         "control",
+                         "Lapatinib_25", "Lapatinib_50", "Lapatinib_100", "Lapatinib_250",
+                         
+                         "Palbociclib_25", "Palbociclib_50", "Palbociclib_100",  "Palbociclib_250" ,
+                         "Gemcitabine_5", "Gemcitabine_10", "Gemcitabine_17", "Gemcitabine_30",
+                         "Palbociclib_25_Gemcitabine_10",
+                         "Palbociclib_100_Gemcitabine_10",
+                         "Palbociclib_250_Gemcitabine_10",
+                         "Doxorubicin_20",
+                         "Palbociclib_50_Doxorubicin_20",
+                         "Lapatinib_100_Doxorubicin_20",
+                         "Paclitaxel_2",
+                         "Paclitaxel_2_Lapatinib_100",
+                         "Paclitaxel_2_Doxorubicin_20",
+                         "Paclitaxel_2_Palbociclib_50",
+                         "Paclitaxel_2_Gemcitabine_10")
+    
+    l1 <- map(dir(paste0(data_path,plateID,"/Analysis/",pipeline_name,"/"),pattern = paste0(plateID,"_.*_level_1.csv"), full.names = TRUE), read_csv,
+              col_types =cols(.default = "c",
+                              ...1 = col_double(),
+                              label...2 = col_double(),
+                              Nuclei_PI_CC_area = col_double(),
+                              Nuclei_PI_CC_eccentricity = col_double(),
+                              Nuclei_PI_CC_mean_intensity = col_double(),
+                              Nuclei_PI_CC_max_intensity = col_double(),
+                              Nuclei_PI_CC_min_intensity = col_double(),
+                              image = col_double(),
+                              well = col_character(),
+                              field = col_double(),
+                              time_slice = col_character(),
+                              label...12 = col_double(),
+                              Cyto_PI_CC_mean_intensity = col_double(),
+                              Cyto_PI_CC_max_intensity = col_double(),
+                              Cyto_PI_CC_min_intensity = col_double(),
+                              Cell_PI_CC_mean_intensity_ratio = col_double(),
+                              Cell_PI_CC_max_intensity_ratio = col_double(),
+                              Cell_PI_CC_min_intensity_ratio = col_double()
+              )) %>%
+      bind_rows() %>%
+      mutate(day = str_remove(time_slice, "d.*"),
+             day = as.integer(day),
+             hour = str_extract(time_slice, "[0-9]*h"),
+             hour = str_remove(hour, "h"),
+             hour = as.integer(hour),
+             minute = str_extract(time_slice, "[0-9]*m"),
+             minute = str_remove(minute, "m"),
+             minute = as.integer(minute),
+             elapsed_minutes = day*24*60+hour*60+minute,
+             elapsed_minutes = case_when(elapsed_minutes%%30 == 0 ~elapsed_minutes,
+                                         elapsed_minutes%%30 == 3 ~elapsed_minutes-3),
+             ligand = paste(Ligand1, Ligand2, Ligand3, sep = "_"),
+             ligand = str_remove_all(ligand, "_none"),
+             drugs =  paste(Drug1 ,Drug2, sep = "_"),
+             drugs = str_remove_all(drugs, "_none|_0"),
+             treatment =  paste(Drug1, Drug1Concentration,Drug2, Drug2Concentration, sep = "_"),
+             treatment = str_remove_all(treatment, "_none|_0"),
+             treatment = factor(treatment, levels = treatment_levels)) %>%
+      filter(!elapsed_minutes %in% c()) 
+    write_csv(l1,level_1_data_path)
+    l2 <- l1 %>%
+      group_by(well, field, elapsed_minutes, treatment, drugs, Drug1,
+               Drug1Concentration, Drug2, Drug2Concentration) %>%
+      summarise(n = n(),
+                Nuclei_PI_CC_mean_intensity=mean(Nuclei_PI_CC_mean_intensity),
+                Cyto_PI_CC_mean_intensity=mean(Cyto_PI_CC_mean_intensity),
+                Cell_PI_CC_mean_intensity_ratio=mean(Cell_PI_CC_mean_intensity_ratio),
+                Cell_PI_CC_max_intensity_ratio=mean(Cell_PI_CC_max_intensity_ratio),
+                Cell_PI_CC_min_intensity_ratio=mean(Cell_PI_CC_min_intensity_ratio),
+                .groups = "drop")
+    
+    l2 <- l2 %>%
+      filter(elapsed_minutes == 0) %>%
+      rename(n_0 = n) %>%
+      select("well", "field", "n_0") %>%
+      right_join(l2,by = c("well", "field")) %>%
+      mutate(cell_count_norm_T0 = n/n_0)
+    
+      write_csv(l2,level_2_data_path)
+    
+  } else {
+    l1 <- read_csv(level_1_data_path,
+                   col_types =cols(.default = "c",
+                                   ...1 = col_double(),
+                                   label...2 = col_double(),
+                                   Nuclei_PI_CC_area = col_double(),
+                                   Nuclei_PI_CC_eccentricity = col_double(),
+                                   Nuclei_PI_CC_mean_intensity = col_double(),
+                                   Nuclei_PI_CC_max_intensity = col_double(),
+                                   Nuclei_PI_CC_min_intensity = col_double(),
+                                   image = col_double(),
+                                   well = col_character(),
+                                   field = col_double(),
+                                   time_slice = col_character(),
+                                   label...12 = col_double(),
+                                   Cyto_PI_CC_mean_intensity = col_double(),
+                                   Cyto_PI_CC_max_intensity = col_double(),
+                                   Cyto_PI_CC_min_intensity = col_double(),
+                                   Cell_PI_CC_mean_intensity_ratio = col_double(),
+                                   Cell_PI_CC_max_intensity_ratio = col_double(),
+                                   Cell_PI_CC_min_intensity_ratio = col_double()
+                   ))
+    l2 <- read_csv(level_2_data_path,
+                   col_types = cols(.default = "c",
+                                    well = col_character(),
+                                    field = col_double(),
+                                    n_0 = col_double(),
+                                    elapsed_minutes = col_double(),
+                                    treatment = col_logical(),
+                                    n = col_double(),
+                                    Nuclei_PI_CC_mean_intensity = col_double(),
+                                    Cyto_PI_CC_mean_intensity = col_double(),
+                                    Cell_PI_CC_mean_intensity_ratio = col_double(),
+                                    Cell_PI_CC_max_intensity_ratio = col_double(),
+                                    Cell_PI_CC_min_intensity_ratio = col_double(),
+                                    cell_count_norm_T0 = col_double()
+                   ))
+  }
+  return(l2)
+}
+
+
+generate_plots <- function(l2){
+  p_n <- ggplot(l2, aes(x = elapsed_minutes, y = n, color = factor(field))) +
+    geom_path() +
+    labs(title = "Cell counts in each field",
+         xlab ="minutes",
+         ylab = "cell count") +
+    facet_wrap(~well, ncol = 6)
+  p_n
+  
+  
+  p_n_t <- ggplot(l2, aes(x = elapsed_minutes, y = n, color = treatment, group = interaction(field, well))) +
+    geom_path() +
+    labs(title = "Cell counts for each treatment",
+         xlab ="minutes",
+         ylab = "cell count") +
+    guides(color = guide_legend(ncol = 1)) +
+    facet_wrap(~treatment, ncol = 6)+
+    theme(strip.text = element_text(size = 5))
+  p_n_t
+  
+  p_n_T0 <- ggplot(l2, aes(x = elapsed_minutes, y = cell_count_norm_T0, color = factor(field))) +
+    geom_path() +
+    labs(title = "Cell counts in each field (T0 normed)",
+         xlab ="minutes",
+         ylab = "cell count") +
+    facet_wrap(~well, ncol = 6)
+  p_n_T0
+  
+  
+  p_n_t_T0 <- ggplot(l2, aes(x = elapsed_minutes, y = cell_count_norm_T0, color = treatment, group = interaction(field, well))) +
+    geom_path() +
+    labs(title = "Cell counts for each treatment (T0 normed)",
+         xlab ="minutes",
+         ylab = "cell count") +
+    guides(color = guide_legend(ncol = 1)) +
+    facet_wrap(~treatment, ncol = 6)+
+    theme(strip.text = element_text(size = 5))
+  p_n_t_T0
+  
+  p_CC <- ggplot(l2, aes(x = elapsed_minutes, y = Nuclei_PI_CC_mean_intensity, color = factor(field))) +
+    geom_path() +
+    labs(title = "Cell cycle intensity in the nuclei, mean",
+         xlab = "minutes",
+         ylab = "intensity") +
+    facet_wrap(~well, ncol = 6)
+  p_CC
+  
+  p_CC_t <- ggplot(l2, aes(x = elapsed_minutes, y = Nuclei_PI_CC_mean_intensity, color = treatment, group = interaction(field, well))) +
+    geom_path() +
+    labs(title = "Cell cycle intensity in the nuclei, mean",
+         xlab = "minutes",
+         ylab = "intensity") +
+    guides(color = guide_legend(ncol = 1)) +
+    facet_wrap(~treatment, ncol = 2)
+  p_CC_t
+  
+  
+  p_cyto_CC <- ggplot(l2, aes(x = elapsed_minutes, y = Cyto_PI_CC_mean_intensity, color = factor(field))) +
+    geom_path() +
+    labs(title = "Cell cycle intensity in the cytoplasm, mean",
+         xlab = "minutes",
+         ylab = "intensity") +
+    facet_wrap(~well, ncol = 6)
+  p_cyto_CC
+  
+  p_cyto_CC_t <- ggplot(l2, aes(x = elapsed_minutes, y = Cyto_PI_CC_mean_intensity, color = treatment, group = interaction(field, well))) +
+    geom_path() +
+    labs(title = "Cell cycle intensity in the cytoplasm, mean",
+         xlab = "minutes",
+         ylab = "intensity") +
+    guides(color = guide_legend(ncol = 1)) +
+    facet_wrap(~treatment, ncol = 6)+
+    theme(strip.text = element_text(size = 5))
+  p_cyto_CC_t
+  
+  p_cyto_CC_ratio <- ggplot(l2, aes(x = elapsed_minutes, y = Cell_PI_CC_mean_intensity_ratio, color = factor(field))) +
+    geom_path() +
+    labs(title = "Cell cycle intensity in the cytoplasm/nuclei, mean",
+         xlab = "minutes",
+         ylab = "intensity") +
+    facet_wrap(~well, ncol = 2)
+  p_cyto_CC_ratio
+  
+  p_cyto_CC_t_ratio <- ggplot(l2, aes(x = elapsed_minutes, y = Cell_PI_CC_mean_intensity_ratio, color = treatment, group = interaction(field, well))) +
+    geom_path() +
+    labs(title = "Cell cycle intensity in the cytoplasm/nuclei, mean",
+         xlab = "minutes",
+         ylab = "intensity") +
+    guides(color = guide_legend(ncol = 1)) +
+    facet_wrap(~treatment, ncol = 2)
+  p_cyto_CC_t_ratio
+
+  
+  pdf(paste0("../plots/",plateID,"_cell_counts_intensities.pdf"), width = 10, height = 14)
+  print(p_n)
+  print(p_n_t)
+  print(p_n_T0)
+  print(p_n_t_T0)
+  print(p_CC)
+  print(p_CC_t)
+  print(p_cyto_CC)
+  print(p_cyto_CC_t)
+  print(p_cyto_CC_ratio)
+  print(p_cyto_CC_t_ratio)
+  res <- dev.off()
+  
+}
+
+compare_to_CP <- function(plateID, l2){
+  ###DEBUG need to deal with time slices that differ by 3 minutes, sometimes
+  plate_CP_data <- map_dfr(dir(path = "../CP_data", pattern = paste0(plateID,".csv"),full.names = TRUE), read_csv) %>%
+    mutate(well_column = str_remove(Metadata_Well, "[A-Z]") %>%
+             sprintf("%02s", .),
+           well_row = str_remove(Metadata_Well, "[[:digit:]*]"),
+           #        Metadata_Well = paste0(well_row, well_column),
+           Time_slice_index = (ImageNumber-1)%% 193+1,
+           elapsed_minutes = (Time_slice_index-1)*30) %>%
+    select(Metadata_Well, Metadata_Site, Count_Nuclei, Time_slice_index,elapsed_minutes)
+  
+  
+  l2_PI_CP <- l2 %>%
+    right_join(plate_CP_data, by = c("well"= "Metadata_Well", "field" = "Metadata_Site", "elapsed_minutes" = "elapsed_minutes")) 
+  
+  cell_counts_PI_CP <- l2_PI_CP %>%
+    select(well, treatment, field, n, Count_Nuclei, elapsed_minutes) %>%
+    pivot_longer(cols = c(n, Count_Nuclei), names_to = "pipeline", values_to = "Cell_count") %>%
+    mutate(pipeline = case_when(pipeline =="n" ~"python_ilastik",
+                                pipeline == "Count_Nuclei" ~"CellProfiler"))
+  
+  p_PI_CP <- ggplot(cell_counts_PI_CP, aes(x = elapsed_minutes, y = Cell_count, color = pipeline, shape = pipeline)) +
+    geom_point(size = .5, alpha = .8) +
+    theme_bw()+
+    theme(strip.text.y = element_text(size = 4)) +
+    facet_grid(well+treatment~field, scales = "free_y")
+  p_PI_CP
+  
+  #compare pipeline results directly
+  cell_counts_PI_CP_wide <- cell_counts_PI_CP %>%
+    pivot_wider(names_from = pipeline, values_from = Cell_count)
+  
+  p_PIvsCP <- ggplot(cell_counts_PI_CP_wide, aes(x = CellProfiler, y = python_ilastik)) +
+    geom_point(size = .5, alpha = .8) +
+    coord_cartesian(xlim = c(0,800), ylim = c(0,800)) +
+    theme_bw()+
+    facet_grid(well~field)
+  p_PIvsCP
+  
+  pdf(paste0("../plots/",plateID,"_cell_count_pipeline_comparison.pdf"), height = 24)
+  print(p_PI_CP)
+  print(p_PIvsCP)
+  res <- dev.off()
+}
+
+
+```
+
+
+
+```{r visualize_data}
+
+process_plate<- function(plateID){
+  l2 = create_level_2_data(plateID)
+  generate_plots(l2)
+  compare_to_CP(plateID, l2)
+}
+
+res <- map(c("AU00901", "AU01001"), process_plate)
+
+```
+
