@@ -36,7 +36,7 @@ mainpath = os.path.join(data_path,plateID,"Analysis",pipeline_name)
 ch1_name = 'NR'
 ch2_name = 'CC'
 cyto_expansion = 5
-minimum_nuclear_radius = 3
+minimum_nuclear_radius = 2
 minimum_nuclear_area = 3.14*minimum_nuclear_radius**2
 
 
@@ -139,7 +139,7 @@ if not os.path.exists(mainpath):
     os.makedirs(mainpath, exist_ok=True)
 if os.path.exists(metadata_filename):
     print("adding "+plateID+" metadata")
-    md_all = pd.read_excel(metadata_filename, engine='openpyxl')
+    md_all = pd.read_excel(metadata_filename, engine='openpyxl', dtype={'Drug1Concentration': str, 'Drug2Concentration': str})
     
     #remove unwanted columns read in from the excel files
     r = re.compile("Unnamed.*")
