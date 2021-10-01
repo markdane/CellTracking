@@ -19,7 +19,7 @@ directory_name = sys.argv[1]
 
 def get_file_df(plate_name):
     print("getting files for "+plate_name)
-    data_path =  '/home/groups/heiserlab_genomics/home/grossse/'+directory_name+'/'+plate_name+'_IMAGES'
+    data_path =  '/home/groups/graylab_share/OMERO.rdsStore/liby/AU565 Drug Screen Project/'+directory_name+'/'+plate_name+'_IMAGES'
     data_paths = glob.glob(os.path.join(data_path,"*.tif"),recursive=False)
     df = pd.DataFrame(data_paths, columns =['path'])
     df['filename'] = df['path'].str.extract('(\w*.tif)')

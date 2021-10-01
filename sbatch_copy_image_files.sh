@@ -25,3 +25,4 @@ srun -c 8 -J AI1902 -o AI1902_out -t 23:00:00 python Live_cell_imaging_file_copy
 srun -c 8 -J AI2001 -o AI2001_out -t 23:00:00 python Live_cell_imaging_file_copy.py AU01501 &
 srun -c 8 -J AI2002 -o AI2002_out -t 23:00:00 python Live_cell_imaging_file_copy.py AU01502 &
 srun -c 8 -J AI2101 -o AI2101_out -t 23:00:00 python Live_cell_imaging_file_copy.py AU01601 &
+srun -c 8 -J C2301 -o C2301_out.txt -t 23:00:00 python Live_cell_imaging_file_copy.py AU02301 &

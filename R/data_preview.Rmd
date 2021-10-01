@@ -16,7 +16,7 @@ library(readxl)
 
 
 ```{r get_data}
-plateID <- "AU01101"
+plateID <- "AU02301"
 data_path <- "/home/exacloud/gscratch/HeiserLab/images/"
 pipeline_name <- "PI"
 
@@ -32,6 +32,7 @@ create_level_2_data <- function(plateID, data_path = "/home/exacloud/gscratch/He
                          
                          "Palbociclib_25", "Palbociclib_50", "Palbociclib_100",  "Palbociclib_250" ,
                          "Gemcitabine_5", "Gemcitabine_10", "Gemcitabine_17", "Gemcitabine_30",
+                         "Gemcitabine_100",
                          "Palbociclib_25_Gemcitabine_10",
                          "Palbociclib_100_Gemcitabine_10",
                          "Palbociclib_250_Gemcitabine_10",
@@ -42,8 +43,11 @@ create_level_2_data <- function(plateID, data_path = "/home/exacloud/gscratch/He
                          "Paclitaxel_2_Lapatinib_100",
                          "Paclitaxel_2_Doxorubicin_20",
                          "Paclitaxel_2_Palbociclib_50",
-                         "Paclitaxel_2_Gemcitabine_10")
-    
+                         "Paclitaxel_2_Gemcitabine_10",
+                         "BEZ235_1", "BEZ235_2.5", "BEZ235_5", "BEZ235_10", "BEZ235_20", "BEZ235_30", "BEZ235_50",
+                         "Cabozantinib_50", "Cabozantinib_100",  "Cabozantinib_250", "Cabozantinib_500", "Cabozantinib_1000","Cabozantinib_2500", "Cabozantinib_5000",
+                         "Trametinib_50", "Trametinib_100", "Trametinib_250", "Trametinib_500", "Trametinib_1000", "Trametinib_2500", "Trametinib_5000")
+   
     l1 <- map(dir(paste0(data_path,plateID,"/Analysis/",pipeline_name,"/"),pattern = paste0(plateID,"_.*_level_1.csv"), full.names = TRUE), read_csv,
               col_types =cols(.default = "c",
                               ...1 = col_double(),
@@ -134,7 +138,6 @@ create_level_2_data <- function(plateID, data_path = "/home/exacloud/gscratch/He
                                     field = col_double(),
                                     n_0 = col_double(),
                                     elapsed_minutes = col_double(),
-                                    treatment = col_logical(),
                                     n = col_double(),
                                     Nuclei_PI_CC_mean_intensity = col_double(),
                                     Cyto_PI_CC_mean_intensity = col_double(),
@@ -299,6 +302,7 @@ compare_to_CP <- function(plateID, l2){
   print(p_PI_CP)
   print(p_PIvsCP)
   res <- dev.off()
+  
 }
 
 
@@ -311,10 +315,10 @@ compare_to_CP <- function(plateID, l2){
 process_plate<- function(plateID){
   l2 = create_level_2_data(plateID)
   generate_plots(l2)
-  compare_to_CP(plateID, l2)
+  #compare_to_CP(plateID, l2)
 }
 
-res <- map(c("AU00901", "AU01001"), process_plate)
+res <- map(c("AU02301"), process_plate)
 
 ```
 
