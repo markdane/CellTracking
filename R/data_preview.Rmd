@@ -16,7 +16,7 @@ library(readxl)
 
 
 ```{r get_data}
-plateID <- "AU02301"
+plateID <- "AU02501"
 data_path <- "/home/exacloud/gscratch/HeiserLab/images/"
 pipeline_name <- "PI"
 
@@ -24,30 +24,30 @@ create_level_2_data <- function(plateID, data_path = "/home/exacloud/gscratch/He
   
   level_1_data_path <- paste0(data_path,plateID,"/Analysis/",pipeline_name,"/",plateID,"_level_1.csv")
   level_2_data_path <- paste0(data_path,plateID,"/Analysis/",pipeline_name,"/",plateID,"_level_2.csv")
-
-  if(!file.exists(level_1_data_path)){
-    treatment_levels = c("vehicle",
-                         "control",
-                         "Lapatinib_25", "Lapatinib_50", "Lapatinib_100", "Lapatinib_250",
-                         
-                         "Palbociclib_25", "Palbociclib_50", "Palbociclib_100",  "Palbociclib_250" ,
-                         "Gemcitabine_5", "Gemcitabine_10", "Gemcitabine_17", "Gemcitabine_30",
-                         "Gemcitabine_100",
-                         "Palbociclib_25_Gemcitabine_10",
-                         "Palbociclib_100_Gemcitabine_10",
-                         "Palbociclib_250_Gemcitabine_10",
-                         "Doxorubicin_20",
-                         "Palbociclib_50_Doxorubicin_20",
-                         "Lapatinib_100_Doxorubicin_20",
-                         "Paclitaxel_2",
-                         "Paclitaxel_2_Lapatinib_100",
-                         "Paclitaxel_2_Doxorubicin_20",
-                         "Paclitaxel_2_Palbociclib_50",
-                         "Paclitaxel_2_Gemcitabine_10",
-                         "BEZ235_1", "BEZ235_2.5", "BEZ235_5", "BEZ235_10", "BEZ235_20", "BEZ235_30", "BEZ235_50",
-                         "Cabozantinib_50", "Cabozantinib_100",  "Cabozantinib_250", "Cabozantinib_500", "Cabozantinib_1000","Cabozantinib_2500", "Cabozantinib_5000",
-                         "Trametinib_50", "Trametinib_100", "Trametinib_250", "Trametinib_500", "Trametinib_1000", "Trametinib_2500", "Trametinib_5000")
+  treatment_levels = c("vehicle",
+                       "control",
+                       "Lapatinib_25", "Lapatinib_50", "Lapatinib_100", "Lapatinib_250",
+                       
+                       "Palbociclib_25", "Palbociclib_50", "Palbociclib_100",  "Palbociclib_250" ,
+                       "Gemcitabine_5", "Gemcitabine_10", "Gemcitabine_17", "Gemcitabine_30",
+                       "Gemcitabine_100",
+                       "Palbociclib_25_Gemcitabine_10",
+                       "Palbociclib_100_Gemcitabine_10",
+                       "Palbociclib_250_Gemcitabine_10",
+                       "Doxorubicin_20",
+                       "Palbociclib_50_Doxorubicin_20",
+                       "Lapatinib_100_Doxorubicin_20",
+                       "Paclitaxel_2",
+                       "Paclitaxel_2_Lapatinib_100",
+                       "Paclitaxel_2_Doxorubicin_20",
+                       "Paclitaxel_2_Palbociclib_50",
+                       "Paclitaxel_2_Gemcitabine_10",
+                       "BEZ235_1", "BEZ235_2.5", "BEZ235_5", "BEZ235_10", "BEZ235_20", "BEZ235_30", "BEZ235_50",
+                       "Cabozantinib_50", "Cabozantinib_100",  "Cabozantinib_250", "Cabozantinib_500", "Cabozantinib_1000","Cabozantinib_2500", "Cabozantinib_5000",
+                       "Trametinib_50", "Trametinib_100", "Trametinib_250", "Trametinib_500", "Trametinib_1000", "Trametinib_2500", "Trametinib_5000")
    
+  if(!file.exists(level_1_data_path)){
+    
     l1 <- map(dir(paste0(data_path,plateID,"/Analysis/",pipeline_name,"/"),pattern = paste0(plateID,"_.*_level_1.csv"), full.names = TRUE), read_csv,
               col_types =cols(.default = "c",
                               ...1 = col_double(),
@@ -87,7 +87,7 @@ create_level_2_data <- function(plateID, data_path = "/home/exacloud/gscratch/He
              drugs = str_remove_all(drugs, "_none|_0"),
              treatment =  paste(Drug1, Drug1Concentration,Drug2, Drug2Concentration, sep = "_"),
              treatment = str_remove_all(treatment, "_none|_0"),
-             treatment = factor(treatment, levels = treatment_levels)) %>%
+             treatment = factor(treatment, levels = treatment_levels, ordered = TRUE)) %>%
       filter(!elapsed_minutes %in% c()) 
     write_csv(l1,level_1_data_path)
     l2 <- l1 %>%
@@ -145,7 +145,8 @@ create_level_2_data <- function(plateID, data_path = "/home/exacloud/gscratch/He
                                     Cell_PI_CC_max_intensity_ratio = col_double(),
                                     Cell_PI_CC_min_intensity_ratio = col_double(),
                                     cell_count_norm_T0 = col_double()
-                   ))
+                   )) %>%
+      mutate(treatment = factor(treatment, levels = treatment_levels, ordered = TRUE))
   }
   return(l2)
 }
@@ -154,18 +155,23 @@ create_level_2_data <- function(plateID, data_path = "/home/exacloud/gscratch/He
 generate_plots <- function(l2){
   p_n <- ggplot(l2, aes(x = elapsed_minutes, y = n, color = factor(field))) +
     geom_path() +
+    stat_summary(fun=mean, aes(group=1), geom="line", colour="blue") +
+    scale_y_continuous(trans = 'log2')+
     labs(title = "Cell counts in each field",
+         subtitle = "organized by position in the plate",
          xlab ="minutes",
-         ylab = "cell count") +
+         ylab = "cell count (log2 spacing)") +
     facet_wrap(~well, ncol = 6)
   p_n
   
-  
   p_n_t <- ggplot(l2, aes(x = elapsed_minutes, y = n, color = treatment, group = interaction(field, well))) +
     geom_path() +
+    stat_summary(fun=mean, aes(group=1), geom="line", colour="blue") +
+    scale_y_continuous(trans = 'log2') +
     labs(title = "Cell counts for each treatment",
+         subtitle = "organized by treatment and dosage",
          xlab ="minutes",
-         ylab = "cell count") +
+         ylab = "cell count (log2 spacing)") +
     guides(color = guide_legend(ncol = 1)) +
     facet_wrap(~treatment, ncol = 6)+
     theme(strip.text = element_text(size = 5))
@@ -173,18 +179,23 @@ generate_plots <- function(l2){
   
   p_n_T0 <- ggplot(l2, aes(x = elapsed_minutes, y = cell_count_norm_T0, color = factor(field))) +
     geom_path() +
+    stat_summary(fun=mean, aes(group=1), geom="line", colour="blue") +
+    scale_y_continuous(trans = 'log2') +
     labs(title = "Cell counts in each field (T0 normed)",
+         subtitle = "organized by position in the plate",
          xlab ="minutes",
-         ylab = "cell count") +
+         ylab = "cell count (log2 spacing)") +
     facet_wrap(~well, ncol = 6)
   p_n_T0
   
-  
   p_n_t_T0 <- ggplot(l2, aes(x = elapsed_minutes, y = cell_count_norm_T0, color = treatment, group = interaction(field, well))) +
     geom_path() +
+    stat_summary(fun=mean, aes(group=1), geom="line", colour="blue") +
+    scale_y_continuous(trans = 'log2') +
     labs(title = "Cell counts for each treatment (T0 normed)",
+         subtitle = "organized by treatment and dosage",
          xlab ="minutes",
-         ylab = "cell count") +
+         ylab = "cell count (log2 spacing)") +
     guides(color = guide_legend(ncol = 1)) +
     facet_wrap(~treatment, ncol = 6)+
     theme(strip.text = element_text(size = 5))
@@ -192,6 +203,7 @@ generate_plots <- function(l2){
   
   p_CC <- ggplot(l2, aes(x = elapsed_minutes, y = Nuclei_PI_CC_mean_intensity, color = factor(field))) +
     geom_path() +
+    stat_summary(fun=mean, aes(group=1), geom="line", colour="blue") +
     labs(title = "Cell cycle intensity in the nuclei, mean",
          xlab = "minutes",
          ylab = "intensity") +
@@ -200,6 +212,7 @@ generate_plots <- function(l2){
   
   p_CC_t <- ggplot(l2, aes(x = elapsed_minutes, y = Nuclei_PI_CC_mean_intensity, color = treatment, group = interaction(field, well))) +
     geom_path() +
+    stat_summary(fun=mean, aes(group=1), geom="line", colour="blue") +
     labs(title = "Cell cycle intensity in the nuclei, mean",
          xlab = "minutes",
          ylab = "intensity") +
@@ -210,6 +223,7 @@ generate_plots <- function(l2){
   
   p_cyto_CC <- ggplot(l2, aes(x = elapsed_minutes, y = Cyto_PI_CC_mean_intensity, color = factor(field))) +
     geom_path() +
+    stat_summary(fun=mean, aes(group=1), geom="line", colour="blue") +
     labs(title = "Cell cycle intensity in the cytoplasm, mean",
          xlab = "minutes",
          ylab = "intensity") +
@@ -218,6 +232,7 @@ generate_plots <- function(l2){
   
   p_cyto_CC_t <- ggplot(l2, aes(x = elapsed_minutes, y = Cyto_PI_CC_mean_intensity, color = treatment, group = interaction(field, well))) +
     geom_path() +
+    stat_summary(fun=mean, aes(group=1), geom="line", colour="blue") +
     labs(title = "Cell cycle intensity in the cytoplasm, mean",
          xlab = "minutes",
          ylab = "intensity") +
@@ -228,6 +243,7 @@ generate_plots <- function(l2){
   
   p_cyto_CC_ratio <- ggplot(l2, aes(x = elapsed_minutes, y = Cell_PI_CC_mean_intensity_ratio, color = factor(field))) +
     geom_path() +
+    stat_summary(fun=mean, aes(group=1), geom="line", colour="blue") +
     labs(title = "Cell cycle intensity in the cytoplasm/nuclei, mean",
          xlab = "minutes",
          ylab = "intensity") +
@@ -236,13 +252,14 @@ generate_plots <- function(l2){
   
   p_cyto_CC_t_ratio <- ggplot(l2, aes(x = elapsed_minutes, y = Cell_PI_CC_mean_intensity_ratio, color = treatment, group = interaction(field, well))) +
     geom_path() +
+    stat_summary(fun=mean, aes(group=1), geom="line", colour="blue") +
     labs(title = "Cell cycle intensity in the cytoplasm/nuclei, mean",
          xlab = "minutes",
          ylab = "intensity") +
     guides(color = guide_legend(ncol = 1)) +
     facet_wrap(~treatment, ncol = 2)
   p_cyto_CC_t_ratio
-
+  
   
   pdf(paste0("../plots/",plateID,"_cell_counts_intensities.pdf"), width = 10, height = 14)
   print(p_n)
@@ -260,14 +277,14 @@ generate_plots <- function(l2){
 }
 
 compare_to_CP <- function(plateID, l2){
-  ###DEBUG need to deal with time slices that differ by 3 minutes, sometimes
   plate_CP_data <- map_dfr(dir(path = "../CP_data", pattern = paste0(plateID,".csv"),full.names = TRUE), read_csv) %>%
     mutate(well_column = str_remove(Metadata_Well, "[A-Z]") %>%
              sprintf("%02s", .),
            well_row = str_remove(Metadata_Well, "[[:digit:]*]"),
            #        Metadata_Well = paste0(well_row, well_column),
            Time_slice_index = (ImageNumber-1)%% 193+1,
-           elapsed_minutes = (Time_slice_index-1)*30) %>%
+           elapsed_minutes = (Time_slice_index-1)*30) %>%  #need to deal with time slices that differ by 3 minutes, sometimes
+
     select(Metadata_Well, Metadata_Site, Count_Nuclei, Time_slice_index,elapsed_minutes)
   
   
@@ -313,12 +330,12 @@ compare_to_CP <- function(plateID, l2){
 ```{r visualize_data}
 
 process_plate<- function(plateID){
-  l2 = create_level_2_data(plateID)
+  l2 <- create_level_2_data(plateID)
   generate_plots(l2)
   #compare_to_CP(plateID, l2)
 }
 
-res <- map(c("AU02301"), process_plate)
+res <- map(c("AU02501"), process_plate)
 
 ```
 
