@@ -1,0 +1,152 @@
+---
+title: "AU565 drug combination responses"
+output: 
+  html_document:
+  code_folding: hide
+---
+
+```{r setup, include=FALSE, cache=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+
+library(tidyverse)
+library(RColorBrewer)
+library(readxl)
+
+```
+
+```{r functions}
+get_l2_data <- function(plateID, data_path = "/home/exacloud/gscratch/HeiserLab/images/", pipeline_name = "PI"){
+  level_2_data_path <- paste0(data_path, plateID, "/Analysis/",pipeline_name,"/",plateID,"_level_2.csv")
+  l2 <- read_csv(level_2_data_path,
+                 col_types = cols(.default = "c",
+                                  well = col_character(),
+                                  field = col_double(),
+                                  n_0 = col_double(),
+                                  elapsed_minutes = col_double(),
+                                  n = col_double(),
+                                  Drug1Concentration = col_double(),
+                                  Nuclei_PI_CC_mean_intensity = col_double(),
+                                  Cyto_PI_CC_mean_intensity = col_double(),
+                                  Cell_PI_CC_mean_intensity_ratio = col_double(),
+                                  Cell_PI_CC_max_intensity_ratio = col_double(),
+                                  Cell_PI_CC_min_intensity_ratio = col_double(),
+                                  cell_count_norm_T0 = col_double()
+                 )) %>%
+    mutate(treatment = factor(treatment, levels = treatment_levels, ordered = TRUE),
+           plateID = plateID)
+  return(l2)
+}
+
+```
+
+
+```{r get_data}
+
+data_path <- "/home/exacloud/gscratch/HeiserLab/images/"
+pipeline_name <- "PI"
+plateIDs <- c("AU02301", "AU02401", "AU02501")
+
+treatment_levels = c("vehicle",
+                       "control",
+                       "Lapatinib_25", "Lapatinib_50", "Lapatinib_100", "Lapatinib_250",
+                       
+                       "Palbociclib_25", "Palbociclib_50", "Palbociclib_100",  "Palbociclib_250" ,
+                       "Gemcitabine_5", "Gemcitabine_10", "Gemcitabine_17", "Gemcitabine_30",
+                       "Gemcitabine_100",
+                       "Palbociclib_25_Gemcitabine_10",
+                       "Palbociclib_100_Gemcitabine_10",
+                       "Palbociclib_250_Gemcitabine_10",
+                       "Doxorubicin_20",
+                       "Palbociclib_50_Doxorubicin_20",
+                       "Lapatinib_100_Doxorubicin_20",
+                       "Paclitaxel_2",
+                       "Paclitaxel_2_Lapatinib_100",
+                       "Paclitaxel_2_Doxorubicin_20",
+                       "Paclitaxel_2_Palbociclib_50",
+                       "Paclitaxel_2_Gemcitabine_10",
+                       "BEZ235_1", "BEZ235_2.5", "BEZ235_5", "BEZ235_10", "BEZ235_20", "BEZ235_30", "BEZ235_50",
+                       "Cabozantinib_50", "Cabozantinib_100",  "Cabozantinib_250", "Cabozantinib_500", "Cabozantinib_1000", "Cabozantinib_2500", "Cabozantinib_5000",
+                       "Trametinib_50", "Trametinib_100", "Trametinib_250", "Trametinib_500", "Trametinib_1000", 
+                       "Trametinib_2500", "Trametinib_5000")
+
+cols <- c("BEZ235_1" = "cornflowerblue", "Cabozantinib_50" = "cornflowerblue", "Trametinib_50" = "cornflowerblue",
+            "BEZ235_2.5" = "darkcyan", "Cabozantinib_100" = "darkcyan","Trametinib_100" = "darkcyan", 
+            "BEZ235_5" = "cadetblue4",   "Cabozantinib_250" = "cadetblue4", "Trametinib_250" = "cadetblue4", 
+            "BEZ235_10" = "cadetblue", "Cabozantinib_500" = "cadetblue",  "Trametinib_500" = "cadetblue", 
+            "BEZ235_20" = "blue",  "Cabozantinib_1000" = "blue", "Trametinib_1000" = "blue",
+            "BEZ235_30" = "blue3",  "Cabozantinib_2500" = "blue3", "Trametinib_2500" = "blue3",
+            "BEZ235_50" = "darkblue", "Cabozantinib_5000" = "darkblue", "Trametinib_5000" = "darkblue")
+
+
+
+l2 <- map(plateIDs, get_l2_data) %>%
+  bind_rows()
+
+#Combine the fields in each well at each time point
+l2_plate_mean <- l2 %>%
+  group_by(plateID, well, treatment, elapsed_minutes, Drug1, Drug1Concentration, drugs) %>%
+  summarise(n = mean(n),
+            cell_count_norm_T0 = mean(cell_count_norm_T0),
+            .groups = "drop")
+
+```
+
+```{r combined_cell_counts, fig.width=5, fig.height=14}
+
+p_n_m_rep <- ggplot(l2_plate_mean, aes(x = elapsed_minutes, y = cell_count_norm_T0, color = plateID, group = interaction(plateID, well))) +
+  geom_path() +
+  scale_y_continuous(trans = 'log2') +
+  labs(title = "Cell counts for all treatments (T0 normed)",
+       subtitle = "organized by treatment and dosage (uM)",
+  xlab ="minutes",
+       ylab = "cell count (log2 spacing)") +
+  guides(color = guide_legend(ncol = 1)) +
+  facet_grid(Drug1Concentration~drugs)+
+  theme(strip.text = element_text(size = 5)) +
+  theme_bw()
+p_n_m_rep
+
+```
+
+```{r combined_dose_response, fig.width=8, fig.height=6}
+#Combine plates to get a single response for each concentration
+
+l2_control_mean <- l2_plate_mean %>%
+  filter(treatment == "control") %>%
+  group_by(treatment, elapsed_minutes, Drug1, Drug1Concentration, drugs) %>%
+  summarise(n = mean(n),
+            cell_count_norm_T0 = mean(cell_count_norm_T0),
+            .groups = "drop") %>%
+  mutate(elapsed_hours = elapsed_minutes/60) %>%
+  select(elapsed_hours, cell_count_norm_T0) %>%
+  rename(control_cell_count_norm_T0 = cell_count_norm_T0)
+
+l2_mean <- l2_plate_mean %>%
+    filter(!treatment == "control") %>%
+  group_by(treatment, elapsed_minutes, Drug1, Drug1Concentration, drugs) %>%
+  summarise(n = mean(n),
+            cell_count_norm_T0 = mean(cell_count_norm_T0),
+            .groups = "drop") %>%
+  mutate(elapsed_hours = elapsed_minutes/60) %>%
+  left_join(l2_control_mean, by = "elapsed_hours")
+
+
+p_n_m_rep <- ggplot(l2_mean, aes(x = elapsed_hours, y = cell_count_norm_T0, color = treatment, group = interaction(Drug1Concentration))) +
+  geom_path() +
+  geom_path(aes(y = control_cell_count_norm_T0), color = "red")+
+  scale_y_continuous(trans = 'log2') +
+  scale_x_continuous(breaks = c(0,24, 48, 72, 96))+
+  scale_color_manual(values = cols) +
+  labs(title = "Cell counts for all treatments (T0 normed)",
+       subtitle = "organized by treatment and dosage (uM)") +
+  xlab("hours") +
+  ylab("relative cell count (log2 spacing)") +
+  guides(color ="none") +
+  facet_wrap(~drugs)+
+  theme(strip.text = element_text(size = 5)) +
+  theme_bw()
+p_n_m_rep
+
+
+```
+
