@@ -8,7 +8,6 @@
 
 
 srun -c 8 -J FI1401 -o FI1401_out -t 23:00:00 python Format_for_ilastik.py AU01401 &
-srun -c 8 -J FI1402 -o FI1402_out -t 23:00:00 python Format_for_ilastik.py AU01402 &
 srun -c 8 -J FI1501 -o FI1501_out -t 23:00:00 python Format_for_ilastik.py AU01501 &
 srun -c 8 -J FI1502 -o FI1502_out -t 23:00:00 python Format_for_ilastik.py AU01502 &
 srun -c 8 -J FI1601 -o FI1601_out -t 23:00:00 python Format_for_ilastik.py AU01601 &
@@ -22,3 +21,4 @@ srun -c 8 -J FI1902 -o FI1902_out -t 23:00:00 python Format_for_ilastik.py AU019
 srun -c 8 -J FI2001 -o FI2001_out -t 23:00:00 python Format_for_ilastik.py AU02001 &
 srun -c 8 -J FI2002 -o FI2002_out -t 23:00:00 python Format_for_ilastik.py AU02002 &
 srun -c 8 -J FI2101 -o FI2101_out -t 23:00:00 python Format_for_ilastik.py AU02101 &
+srun -c 8 -J FI2401 -o FI2401_out -t 23:00:00 python Format_for_ilastik.py AU02401 &

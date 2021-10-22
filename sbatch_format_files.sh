@@ -19,3 +19,4 @@ srun -c 4 -o FI1101.txt --job-name FI1101 --time 23:00:00 python Format_for_ilas
 srun -c 4 -o FI1102.txt --job-name FI1102 --time 23:00:00 python Format_for_ilastik.py AU01102 &
 srun -c 4 -o FI1102.txt --job-name FI1102 --time 23:00:00 python Format_for_ilastik.py AU01102 &
 srun -c 4 -o FI2301.txt --job-name FI2301 --time 23:00:00 python Format_for_ilastik.py AU02301 &
+srun -c 4 -o FI2501.txt --job-name FI2501 --time 23:00:00 python Format_for_ilastik.py AU02501 &
