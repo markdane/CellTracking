@@ -3,7 +3,7 @@ library(tidyverse)
 data_path <- "../../../images/"
 pipeline_name = "PI"
 plateIDs <- c("AU00601","AU00602","AU00701","AU00702","AU00801","AU00802","AU00901","AU00902","AU01001","AU01002","AU01101","AU01102")
-plateIDs <- #c("AU01401","AU01402","AU01501","AU01502","AU01601","AU01602","AU01701","AU01702","AU01801","AU01802","AU01901","AU01902","AU02001","AU02002","AU02101")
+#plateIDs <- c("AU01401","AU01402","AU01501","AU01502","AU01601","AU01602","AU01701","AU01702","AU01801","AU01802","AU01901","AU01902","AU02001","AU02002","AU02101")
 data_paths <- paste0(data_path, plateIDs)
 
 #read file names into a dataframe
@@ -27,6 +27,7 @@ df <- map(data_paths, dir, pattern = "m.tif", recursive = TRUE) %>%
            timepoint = str_remove_all(timepoint,".tif")
          )
 write_csv(df, "AU565_DS2_library.csv")
+IDR_well_library <- df
 
 #generate manifest of combined files
 df <- map(data_paths, dir, pattern = "_stack.tif", recursive = TRUE) %>%
