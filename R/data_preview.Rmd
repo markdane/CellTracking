@@ -416,7 +416,7 @@ data_path <- "/home/exacloud/gscratch/HeiserLab/images/"
 pipeline_name <- "PI"
    
 #res <- map(c("AU01401", "AU01502", "AU01601","AU01602", "AU01701", "AU01702"), process_plate)
-res <- map(c("AU01401", "AU01601", "AU01701", ), process_plate)
+res <- map(c("AU01401", "AU01601", "AU01701"), process_plate)
 
 ```
 
