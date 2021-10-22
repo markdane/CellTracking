@@ -16,15 +16,13 @@ library(readxl)
 
 
 ```{r get_data}
-plateID <- "AU02501"
-data_path <- "/home/exacloud/gscratch/HeiserLab/images/"
-pipeline_name <- "PI"
 
 create_level_2_data <- function(plateID, data_path = "/home/exacloud/gscratch/HeiserLab/images/", pipeline_name = "PI"){
   
   level_1_data_path <- paste0(data_path,plateID,"/Analysis/",pipeline_name,"/",plateID,"_level_1.csv")
   level_2_data_path <- paste0(data_path,plateID,"/Analysis/",pipeline_name,"/",plateID,"_level_2.csv")
-  treatment_levels = c("vehicle",
+
+    treatment_levels = c("vehicle",
                        "control",
                        "Lapatinib_25", "Lapatinib_50", "Lapatinib_100", "Lapatinib_250",
                        
@@ -43,9 +41,14 @@ create_level_2_data <- function(plateID, data_path = "/home/exacloud/gscratch/He
                        "Paclitaxel_2_Palbociclib_50",
                        "Paclitaxel_2_Gemcitabine_10",
                        "BEZ235_1", "BEZ235_2.5", "BEZ235_5", "BEZ235_10", "BEZ235_20", "BEZ235_30", "BEZ235_50",
-                       "Cabozantinib_50", "Cabozantinib_100",  "Cabozantinib_250", "Cabozantinib_500", "Cabozantinib_1000","Cabozantinib_2500", "Cabozantinib_5000",
-                       "Trametinib_50", "Trametinib_100", "Trametinib_250", "Trametinib_500", "Trametinib_1000", "Trametinib_2500", "Trametinib_5000")
-   
+                       "Cabozantinib_50", "Cabozantinib_100",  "Cabozantinib_250", "Cabozantinib_500", "Cabozantinib_1000", "Cabozantinib_2500", "Cabozantinib_5000",
+                       "Trametinib_50", "Trametinib_100", "Trametinib_250", "Trametinib_500", "Trametinib_1000", 
+                       "Trametinib_2500", "Trametinib_5000",
+                        "5FU_125", "5FU_250", "5FU_400", "5FU_550", "5FU_750", "5FU_1000", "5FU_2500", 
+                       "AZD5438_50", "AZD5438_100", "AZD5438_250","AZD5438_500", "AZD5438_1000", "AZD5438_2500", "AZD5438_5000",
+                       "Panobinostat.5", "Panobinostat_1", "Panobinostat_2.5", "Panobinostat_5" , "Panobinostat_6.5" ,  "Panobinostat_10", "Panobinostat_12.5")
+  
+
   if(!file.exists(level_1_data_path)){
     
     l1 <- map(dir(paste0(data_path,plateID,"/Analysis/",pipeline_name,"/"),pattern = paste0(plateID,"_.*_level_1.csv"), full.names = TRUE), read_csv,
@@ -89,6 +92,7 @@ create_level_2_data <- function(plateID, data_path = "/home/exacloud/gscratch/He
              treatment = str_remove_all(treatment, "_none|_0"),
              treatment = factor(treatment, levels = treatment_levels, ordered = TRUE)) %>%
       filter(!elapsed_minutes %in% c()) 
+    
     write_csv(l1,level_1_data_path)
     l2 <- l1 %>%
       group_by(well, field, elapsed_minutes, treatment, drugs, Drug1,
@@ -101,8 +105,12 @@ create_level_2_data <- function(plateID, data_path = "/home/exacloud/gscratch/He
                 Cell_PI_CC_min_intensity_ratio=mean(Cell_PI_CC_min_intensity_ratio),
                 .groups = "drop")
     
+    #normalize to earliest time point
+    earliest_time_point <- unique(l2$elapsed_minutes) %>%
+      min() 
+      
     l2 <- l2 %>%
-      filter(elapsed_minutes == 0) %>%
+      filter(elapsed_minutes == earliest_time_point) %>%
       rename(n_0 = n) %>%
       select("well", "field", "n_0") %>%
       right_join(l2,by = c("well", "field")) %>%
@@ -139,6 +147,7 @@ create_level_2_data <- function(plateID, data_path = "/home/exacloud/gscratch/He
                                     n_0 = col_double(),
                                     elapsed_minutes = col_double(),
                                     n = col_double(),
+                                    Drug1Concentration = col_character(),
                                     Nuclei_PI_CC_mean_intensity = col_double(),
                                     Cyto_PI_CC_mean_intensity = col_double(),
                                     Cell_PI_CC_mean_intensity_ratio = col_double(),
@@ -152,7 +161,23 @@ create_level_2_data <- function(plateID, data_path = "/home/exacloud/gscratch/He
 }
 
 
-generate_plots <- function(l2){
+generate_plots <- function(plateID, l2){
+  cols <- c("BEZ235_1" = "cornflowerblue", "Cabozantinib_50" = "cornflowerblue", "Trametinib_50" = "cornflowerblue",
+            "BEZ235_2.5" = "darkcyan", "Cabozantinib_100" = "darkcyan","Trametinib_100" = "darkcyan", 
+            "BEZ235_5" = "cadetblue4",   "Cabozantinib_250" = "cadetblue4", "Trametinib_250" = "cadetblue4", 
+            "BEZ235_10" = "cadetblue", "Cabozantinib_500" = "cadetblue",  "Trametinib_500" = "cadetblue", 
+            "BEZ235_20" = "blue",  "Cabozantinib_1000" = "blue", "Trametinib_1000" = "blue",
+            "BEZ235_30" = "blue3",  "Cabozantinib_2500" = "blue3", "Trametinib_2500" = "blue3",
+            "BEZ235_50" = "darkblue", "Cabozantinib_5000" = "darkblue", "Trametinib_5000" = "darkblue",
+            "5FU_125" = "cornflowerblue", "5FU_250"= "darkcyan", "5FU_400" = "cadetblue4", "5FU_550" = "cadetblue",
+            "5FU_750" = "blue", "5FU_1000" = "blue3", "5FU_2500" = "darkblue", 
+            "AZD5438_50"= "cornflowerblue", "AZD5438_100"= "darkcyan", "AZD5438_250" = "cadetblue4",
+            "AZD5438_500" = "cadetblue", "AZD5438_1000" = "blue", "AZD5438_2500" = "blue3",
+            "AZD5438_5000" = "darkblue",
+            "Panobinostat.5"= "cornflowerblue", "Panobinostat_1"= "darkcyan", "Panobinostat_2.5" = "cadetblue4",
+            "Panobinostat_5" = "cadetblue", "Panobinostat_6.5"  = "blue",  "Panobinostat_10" = "blue3",
+            "Panobinostat_12.5" = "darkblue")
+  
   p_n <- ggplot(l2, aes(x = elapsed_minutes, y = n, color = factor(field))) +
     geom_path() +
     stat_summary(fun=mean, aes(group=1), geom="line", colour="blue") +
@@ -200,6 +225,26 @@ generate_plots <- function(l2){
     facet_wrap(~treatment, ncol = 6)+
     theme(strip.text = element_text(size = 5))
   p_n_t_T0
+  
+  #summarize each well and group plots by drug
+  l2_mean <- l2 %>%
+    group_by(well, elapsed_minutes, treatment, drugs, Drug1Concentration) %>%
+    summarise(cell_count_norm_T0 = mean(cell_count_norm_T0),
+              n = mean(n))
+
+      p_n_t_T0_mean <- ggplot(l2_mean, aes(x = elapsed_minutes, y = cell_count_norm_T0, color = treatment, group = interaction(well, Drug1Concentration))) +
+    geom_path() +
+    scale_y_continuous(trans = 'log2') +
+      scale_color_manual(values = cols) +
+    labs(title = "Cell counts for each treatment (T0 normed)",
+         subtitle = "organized by treatment and dosage",
+         xlab ="minutes",
+         ylab = "cell count (log2 spacing)") +
+    guides(color = guide_legend(ncol = 1)) +
+    facet_wrap(~drugs, ncol = 6)+
+    theme(strip.text = element_text(size = 5)) +
+      theme_bw()
+  p_n_t_T0_mean
   
   p_CC <- ggplot(l2, aes(x = elapsed_minutes, y = Nuclei_PI_CC_mean_intensity, color = factor(field))) +
     geom_path() +
@@ -260,18 +305,50 @@ generate_plots <- function(l2){
     facet_wrap(~treatment, ncol = 2)
   p_cyto_CC_t_ratio
   
+  #look at density plots of the cell cycle ratios per image
+  #start with just the initial time point
+  earliest_time_point <- unique(l2$elapsed_minutes) %>%
+      min() 
+  time_interval <- 1440
+  unique_timepoints <- unique(l2$elapsed_minutes)
+  selected_timepoints <- time_interval*as.integer(unique_timepoints/time_interval) %>%
+    unique()
+  
+  df <- l1 %>%
+    filter(elapsed_minutes %in% selected_timepoints) %>%
+    mutate(elapsed_hours = elapsed_minutes/60)
+  
+  p_densities <- ggplot(df, aes(Cell_PI_CC_mean_intensity_ratio, fill = treatment, color = treatment)) +
+    geom_density(alpha = .2)+
+          scale_color_manual(values = cols) +
+              scale_fill_manual(values = cols) +
+    facet_grid(elapsed_hours~drugs) +
+    guides(fill = "none", color = "none") +
+    theme_bw()
+  p_densities
+  
+  # p <- ggplot(df, aes(Cell_PI_CC_mean_intensity_ratio, fill = elapsed_hours, color = elapsed_hours)) +
+  #   geom_density(alpha = .2)+
+  #         # scale_color_manual(values = time_cols) +
+  #         #     scale_fill_manual(values = cols) +
+  #   facet_grid(treatment~drugs) +
+  #   guides(fill = "none", color = "none") +
+  #   theme_bw()
+  # p
   
   pdf(paste0("../plots/",plateID,"_cell_counts_intensities.pdf"), width = 10, height = 14)
   print(p_n)
   print(p_n_t)
   print(p_n_T0)
   print(p_n_t_T0)
+  print(p_n_t_T0_mean)
   print(p_CC)
   print(p_CC_t)
   print(p_cyto_CC)
   print(p_cyto_CC_t)
   print(p_cyto_CC_ratio)
   print(p_cyto_CC_t_ratio)
+  print(p_densities)
   res <- dev.off()
   
 }
@@ -331,11 +408,15 @@ compare_to_CP <- function(plateID, l2){
 
 process_plate<- function(plateID){
   l2 <- create_level_2_data(plateID)
-  generate_plots(l2)
+  generate_plots(plateID, l2)
   #compare_to_CP(plateID, l2)
 }
 
-res <- map(c("AU02501"), process_plate)
+data_path <- "/home/exacloud/gscratch/HeiserLab/images/"
+pipeline_name <- "PI"
+   
+#res <- map(c("AU01401", "AU01502", "AU01601","AU01602", "AU01701", "AU01702"), process_plate)
+res <- map(c("AU01401", "AU01601", "AU01701", ), process_plate)
 
 ```
 
