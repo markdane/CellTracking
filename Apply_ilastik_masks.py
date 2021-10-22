@@ -41,10 +41,6 @@ minimum_nuclear_area = 3.14*minimum_nuclear_radius**2
 
 
 # Get the green raw image files and apply the mask to extract the intensity data. Extract morphology values from the masks.
-
-# In[19]:
-
-
 results = []
 for mask_path in mask_paths: #Each mask_path is a sequence of images
     print("processing files in "+mask_path)
@@ -70,6 +66,7 @@ for mask_path in mask_paths: #Each mask_path is a sequence of images
 
         # open masks to delete small regions
         nuclei_masks_open = morphology.binary_opening(image, selem=morphology.disk(2))     
+        nuclei_masks_open = image #don't perform any filtering   
 
         # label the masks with unique integers starting at 0
         nuclei_masks_all = measure.label(nuclei_masks_open)
@@ -115,17 +112,20 @@ for mask_path in mask_paths: #Each mask_path is a sequence of images
             df_all = pd.concat([nuclei_g_data, nuclei_exp_g_data], axis=1, join="outer")
             #append this image's data to the rest of the data
             results.append(df_all)
+            
+            #Save mask image
+            #create output directory if it doesn't exist
+            if not os.path.exists(input_files_path+'/masks/'+well+'/field_'+field_num):
+                os.makedirs(input_files_path+'/masks/'+well+'/field_'+field_num, exist_ok=True)
+            mask_filename = input_files_path+'/masks/'+well+'/field_'+field_num+'/'+well+'_'+field_num+'_image'+str(img_num)+'_nuclei_masks.tif'
+            io.imsave(mask_filename, nuclei_masks.astype('uint16'), check_contrast=False)
+            cyto_mask_filename =  input_files_path+'/masks/'+well+'/field_'+field_num+'/'+well+'_'+field_num+'_image'+str(img_num)+'_cyto_masks.tif'
+            io.imsave(cyto_mask_filename, nuclei_expansions.astype('uint16'), check_contrast=False)
     #Done processing all of the images in the sequence so concatenate all of the dataframes
     results_pd = pd.concat(results)
 
 #concatenate all of the results from the sequences in the well
 l0 = pd.concat(results)
-
-    #Save mask image
-    #mask_filename = data_path+plateID+'/'+well+'/'+field+'/output_stacks/'+well+'_'+field+'_image'+str(img_num)+'_nuclei_masks.tif'
-        #io.imsave(mask_filename, nuclei_masks.astype('uint16'))
-        #cyto_mask_filename = data_path+plateID+'/'+well+'/'+field+'/output_stacks/'+well+'_'+field+'_image'+str(img_num)+'_cyto_masks.tif'
-        #io.imsave(cyto_mask_filename, nuclei_expansions.astype('uint16'))
 
 
 # If the metadata files exists, combine the data with the experimental metadata and write out a level 1 file. Otherwise, write out a level 0 file so we don't waste the results.

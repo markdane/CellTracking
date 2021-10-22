@@ -21,7 +21,7 @@ output_path = os.path.join(data_path+plateID,"Analysis",pipeline_name,"intermedi
 subdirectories = sorted(glob.glob(os.path.join(data_path+plateID,"[A-Z][1-9]","field_[1-9]")))
 
 
-# Only create a job if there is no stack of RGP files
+# Only process the files if there is no stack of RGP files
 
 flourescent_scaler = 255/4095 #rescale from 12 to 8 bits
 for subdir in subdirectories:

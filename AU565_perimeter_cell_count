@@ -1,0 +1,280 @@
+{
+ "cells": [
+  {
+   "cell_type": "code",
+   "execution_count": 33,
+   "id": "81db8219-0c51-4185-b67a-40a9531e3ca6",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "#setup libraries\n",
+    "import pandas as pd\n",
+    "import numpy as np\n",
+    "import os, re, glob, sys, statistics, math\n",
+    "from skimage import io, morphology, segmentation, measure\n",
+    "import h5py\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "d202bde7-061c-43e5-ae4c-ad357889720e",
+   "metadata": {},
+   "source": [
+    "In order to count how many cells in the perimeter of an image sequence, we first need to extract the XY postions of each cell. We will use AU00601, well A1 and field 1, a control well."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 3,
+   "id": "5d79184b-6e27-4544-a793-f52405e63a90",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "pipeline_name = 'PI' # python + ilastik\n",
+    "data_path = '/home/exacloud/gscratch/HeiserLab/images/'\n",
+    "plateID = 'AU00601' #sys.argv[1]\n",
+    "well = 'A1' #sys.argv[2]\n",
+    "input_files_path = os.path.join(data_path+plateID,\"Analysis\",pipeline_name,\"intermediate_files\")\n",
+    "image_stack_paths = sorted(glob.glob(input_files_path+\"/\"+plateID+\"_RGP_\"+well+\"*stack.tif\"))\n",
+    "mask_paths = sorted(glob.glob(input_files_path+\"/\"+plateID+\"_RGP_\"+well+\"*Segmentation.h5\"))\n",
+    "mainpath = os.path.join(data_path,plateID,\"Analysis\",pipeline_name)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 4,
+   "id": "e353be94-dfd2-496a-9f71-0c64e5e92c8d",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "ch1_name = 'NR'\n",
+    "ch2_name = 'CC'\n",
+    "cyto_expansion = 5\n",
+    "minimum_nuclear_radius = 3\n",
+    "minimum_nuclear_area = 3.14*minimum_nuclear_radius**2"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 53,
+   "id": "3cc21211-afcd-4560-b1f5-5a64212959ee",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "processing files in /home/exacloud/gscratch/HeiserLab/images/AU00601/Analysis/PI/intermediate_files/AU00601_RGP_A1_1_stack_Simple Segmentation.h5\n",
+      "processing files in /home/exacloud/gscratch/HeiserLab/images/AU00601/Analysis/PI/intermediate_files/AU00601_RGP_A1_2_stack_Simple Segmentation.h5\n",
+      "processing files in /home/exacloud/gscratch/HeiserLab/images/AU00601/Analysis/PI/intermediate_files/AU00601_RGP_A1_3_stack_Simple Segmentation.h5\n",
+      "processing files in /home/exacloud/gscratch/HeiserLab/images/AU00601/Analysis/PI/intermediate_files/AU00601_RGP_A1_4_stack_Simple Segmentation.h5\n"
+     ]
+    }
+   ],
+   "source": [
+    "results = []\n",
+    "for mask_path in mask_paths: #Each mask_path is a sequence of images\n",
+    "    print(\"processing files in \"+mask_path)\n",
+    "    #load the pixel masks\n",
+    "    f = h5py.File(mask_path, 'r')\n",
+    "    mask_dataset = f['exported_data']\n",
+    "    masks_stack = np.stack(mask_dataset)\n",
+    "    nuclei_masks_raw = masks_stack == 4 # set nuclei pixels to True and the rest to False\n",
+    "\n",
+    "    #load the corresponding green images\n",
+    "    field = re.findall(\"_[1-9]_\",mask_path)[0]\n",
+    "    field_num = re.findall(\"[1-9]\", field)[0]\n",
+    "\n",
+    "    g_data_paths = glob.glob(os.path.join(data_path,plateID,well,\"field_\"+field_num,\"*_G_*.tif\"))\n",
+    "    img_g_ic = io.imread_collection(g_data_paths) # 3 dimensions : frames x width x height sorted by name\n",
+    "    img_gs = np.stack(img_g_ic)\n",
+    "    \n",
+    "    #read in the corresponding data file names to get time slices\n",
+    "    with open(re.sub(\"stack_Simple Segmentation.h5\",\"filenames.txt\", mask_path)) as f:\n",
+    "        filenames = f.readlines()\n",
+    "    \n",
+    "    for img_num, image in enumerate(nuclei_masks_raw[:,:,:,0]): #process each image in the mask_path sequence of images\n",
+    "\n",
+    "        # open masks to delete small regions\n",
+    "        nuclei_masks_open = morphology.binary_opening(image, selem=morphology.disk(2))     \n",
+    "        nuclei_masks_open = image #don't perform any filtering   \n",
+    "\n",
+    "        # label the masks with unique integers starting at 0\n",
+    "        nuclei_masks_all = measure.label(nuclei_masks_open)\n",
+    "        #read in filenames to get time slice data\n",
+    "        #need to ensure there are nuclei pixels to process\n",
+    "        if np.amax(nuclei_masks_all) >0: #Only process if there is at least one mask\n",
+    "            nuclei_g = measure.regionprops_table(nuclei_masks_all, intensity_image = img_gs[img_num], properties=('label', 'area'))\n",
+    "\n",
+    "            #remove masks too small to be a nucleus\n",
+    "            indices_to_keep = np.array([x if x-1 in np.argwhere(nuclei_g['area']>minimum_nuclear_area)\n",
+    "                                    else 0 for x in range(nuclei_g['label'].max()+1)])\n",
+    "            nuclei_masks = indices_to_keep[nuclei_masks_all]\n",
+    "            nuclei_g = measure.regionprops_table(nuclei_masks, intensity_image = img_gs[img_num], properties=('label', 'centroid', 'area'))\n",
+    "            #expand the masks to get cytoplasmic regions\n",
+    "\n",
+    "            # turn results into a dataframe\n",
+    "            nuclei_g_data = pd.DataFrame(nuclei_g)\n",
+    "            nuclei_g_data.rename(columns={col: 'Nuclei_'+pipeline_name+'_' +ch2_name+'_'+col  for col in nuclei_g_data.columns if col not in ['label']}, inplace=True)\n",
+    "\n",
+    "            # add an image number and collect the data                                                                                                             \n",
+    "            nuclei_g_data['image'] = img_num+1\n",
+    "\n",
+    "            # add the well and field values to the dataframe\n",
+    "            nuclei_g_data['well'] = well\n",
+    "            nuclei_g_data['field'] = field_num\n",
+    "            #add the time slice to the dataframe\n",
+    "            nuclei_g_data['time_slice'] = re.findall(\"[0-9d]{3}[0-9h]{3}[0-9m]{3}\", filenames[img_num])[0]\n",
+    "\n",
+    "            #concatenate the dataframes\n",
+    "            #df_all = pd.concat([nuclei_g_data, nuclei_exp_g_data], axis=1, join=\"outer\")\n",
+    "            df_all = nuclei_g_data\n",
+    "            #append this image's data to the rest of the data\n",
+    "            results.append(df_all)\n",
+    "            \n",
+    "    #Done processing all of the images in the sequence so concatenate all of the dataframes\n",
+    "    results_pd = pd.concat(results)\n",
+    "\n",
+    "#concatenate all of the results from the sequences in the well\n",
+    "l0 = pd.concat(results)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "9cbd10cf-9fec-48dc-a203-581c4b36b623",
+   "metadata": {},
+   "source": [
+    "Define the border area as one average cell nuclei diameter. The image is 1040 x 1408\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 54,
+   "id": "cb1e8e23-38a4-4e74-9a84-9478d8e24fac",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "average_cell_diameter = math.sqrt(statistics.mean(l0['Nuclei_PI_CC_area'])/3.14)*2\n",
+    "max_x = 1408\n",
+    "max_y = 1040\n",
+    "left_border = average_cell_diameter\n",
+    "upper_border = average_cell_diameter\n",
+    "right_border = max_x - average_cell_diameter\n",
+    "lower_border = max_y - average_cell_diameter\n",
+    "l0['border_cell'] = False\n",
+    "left_border_cell = l0['Nuclei_PI_CC_centroid-0'] < left_border\n",
+    "right_border_cell = l0['Nuclei_PI_CC_centroid-0'] > right_border\n",
+    "upper_border_cell = l0['Nuclei_PI_CC_centroid-0'] < upper_border\n",
+    "lower_border_cell = l0['Nuclei_PI_CC_centroid-0'] > lower_border\n",
+    "\n",
+    "l0.loc[left_border_cell, 'border_cell'] = True\n",
+    "l0.loc[right_border_cell, 'border_cell'] = True\n",
+    "l0.loc[upper_border_cell, 'border_cell'] = True\n",
+    "l0.loc[lower_border_cell, 'border_cell'] = True"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 55,
+   "id": "766accea-60c6-4c8c-a644-6636b1d97f1f",
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "0      False\n",
+       "1      False\n",
+       "2      False\n",
+       "3      False\n",
+       "4      False\n",
+       "       ...  \n",
+       "406     True\n",
+       "407     True\n",
+       "408     True\n",
+       "409     True\n",
+       "410     True\n",
+       "Name: border_cell, Length: 219650, dtype: bool"
+      ]
+     },
+     "execution_count": 55,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "l0['border_cell']"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 56,
+   "id": "4af1b6b4-ea74-4ffe-b5d2-6246ac31d539",
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "8115"
+      ]
+     },
+     "execution_count": 56,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "sum(l0['border_cell'])\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 57,
+   "id": "0582ebea-1fbd-49e4-ba28-8c5745a5ab44",
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "0.0369451399954473"
+      ]
+     },
+     "execution_count": 57,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "sum(l0['border_cell'])/len(l0['border_cell'])"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "e1d91bb3-f885-4ed2-9bac-6755f1d6bd97",
+   "metadata": {},
+   "outputs": [],
+   "source": []
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "biapy",
+   "language": "python",
+   "name": "biapy"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.7.10"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}

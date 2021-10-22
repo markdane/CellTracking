@@ -2,7 +2,7 @@
 # coding: utf-8
 
 
-import os, re, glob, sys
+import os, re, glob, sys, time
 
 pipeline_name = "PI"
 data_path = '/home/exacloud/gscratch/HeiserLab/images/'
@@ -22,5 +22,6 @@ for file_path in file_paths:
         if returned_value == 0:
             print("launched job to create masks for "+file_path)
         else:
-            print("failed to launch job to create masks for "+file_path)
+            print("failed to launch job to create masks for "+file_path+" returned value "+str(returned_value))
+        time.sleep(.1)
 
