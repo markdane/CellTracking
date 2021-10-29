@@ -44,9 +44,15 @@ create_level_2_data <- function(plateID, data_path = "/home/exacloud/gscratch/He
                        "Cabozantinib_50", "Cabozantinib_100",  "Cabozantinib_250", "Cabozantinib_500", "Cabozantinib_1000", "Cabozantinib_2500", "Cabozantinib_5000",
                        "Trametinib_50", "Trametinib_100", "Trametinib_250", "Trametinib_500", "Trametinib_1000", 
                        "Trametinib_2500", "Trametinib_5000",
-                        "5FU_125", "5FU_250", "5FU_400", "5FU_550", "5FU_750", "5FU_1000", "5FU_2500", 
+                       "5FU_125", "5FU_250", "5FU_400", "5FU_550", "5FU_750", "5FU_1000", "5FU_2500", 
                        "AZD5438_50", "AZD5438_100", "AZD5438_250","AZD5438_500", "AZD5438_1000", "AZD5438_2500", "AZD5438_5000",
-                       "Panobinostat.5", "Panobinostat_1", "Panobinostat_2.5", "Panobinostat_5" , "Panobinostat_6.5" ,  "Panobinostat_10", "Panobinostat_12.5")
+                       "Panobinostat.5", "Panobinostat_1", "Panobinostat_2.5", "Panobinostat_5" , "Panobinostat_6.5" ,  "Panobinostat_10", "Panobinostat_12.5",
+                       "JQ1_50",  "JQ1_100", "JQ1_250", "JQ1_500", "JQ1_1000", "JQ1_2500", "JQ1_5000",
+                        "Bortezomib_1",  "Bortezomib_2.5", "Bortezomib_5", "Bortezomib_10", "Bortezomib_20", "Bortezomib_30", 
+                       "Bortezomib_50",  "Bortezomib_100", "Bortezomib_250", "Bortezomib_500", "Bortezomib_1000", "Bortezomib_2500", "Bortezomib_5000",
+                       "MK1775_50", "MK1775_100", "MK1775_175","MK1775_275", "MK1775_375", "MK1775_500", "MK1775_700",
+                       "MG132_1", "MG132_2.5","MG132_5","MG132_10","MG132_20","MG132_30","MG132_50",
+                       "Everolimus_50","Everolimus_100","Everolimus_250","Everolimus_500","Everolimus_1000","Everolimus_2500","Everolimus_5000")
   
 
   if(!file.exists(level_1_data_path)){
@@ -90,7 +96,9 @@ create_level_2_data <- function(plateID, data_path = "/home/exacloud/gscratch/He
              drugs = str_remove_all(drugs, "_none|_0"),
              treatment =  paste(Drug1, Drug1Concentration,Drug2, Drug2Concentration, sep = "_"),
              treatment = str_remove_all(treatment, "_none|_0"),
-             treatment = factor(treatment, levels = treatment_levels, ordered = TRUE)) %>%
+             treatment = factor(treatment, levels = treatment_levels, ordered = TRUE),
+             cell_cycle_state = case_when(Cell_PI_CC_mean_intensity_ratio <= 1 ~"G1",
+                                          Cell_PI_CC_mean_intensity_ratio > 1 ~"S/G2")) %>%
       filter(!elapsed_minutes %in% c()) 
     
     write_csv(l1,level_1_data_path)
@@ -103,6 +111,7 @@ create_level_2_data <- function(plateID, data_path = "/home/exacloud/gscratch/He
                 Cell_PI_CC_mean_intensity_ratio=mean(Cell_PI_CC_mean_intensity_ratio),
                 Cell_PI_CC_max_intensity_ratio=mean(Cell_PI_CC_max_intensity_ratio),
                 Cell_PI_CC_min_intensity_ratio=mean(Cell_PI_CC_min_intensity_ratio),
+                G1_proportion = table(cell_cycle_state)[1]/n,
                 .groups = "drop")
     
     #normalize to earliest time point
@@ -138,7 +147,8 @@ create_level_2_data <- function(plateID, data_path = "/home/exacloud/gscratch/He
                                    Cyto_PI_CC_min_intensity = col_double(),
                                    Cell_PI_CC_mean_intensity_ratio = col_double(),
                                    Cell_PI_CC_max_intensity_ratio = col_double(),
-                                   Cell_PI_CC_min_intensity_ratio = col_double()
+                                   Cell_PI_CC_min_intensity_ratio = col_double(),
+                                   cell_cycle_state = col_character()
                    ))
     l2 <- read_csv(level_2_data_path,
                    col_types = cols(.default = "c",
@@ -153,18 +163,19 @@ create_level_2_data <- function(plateID, data_path = "/home/exacloud/gscratch/He
                                     Cell_PI_CC_mean_intensity_ratio = col_double(),
                                     Cell_PI_CC_max_intensity_ratio = col_double(),
                                     Cell_PI_CC_min_intensity_ratio = col_double(),
-                                    cell_count_norm_T0 = col_double()
+                                    cell_count_norm_T0 = col_double(),
+                                    G1_proportion = col_double()
                    )) %>%
       mutate(treatment = factor(treatment, levels = treatment_levels, ordered = TRUE))
   }
-  return(l2)
+  return(list(l1=l1, l2=l2))
 }
 
 
-generate_plots <- function(plateID, l2){
+generate_plots <- function(plateID, l1, l2){
   cols <- c("BEZ235_1" = "cornflowerblue", "Cabozantinib_50" = "cornflowerblue", "Trametinib_50" = "cornflowerblue",
-            "BEZ235_2.5" = "darkcyan", "Cabozantinib_100" = "darkcyan","Trametinib_100" = "darkcyan", 
-            "BEZ235_5" = "cadetblue4",   "Cabozantinib_250" = "cadetblue4", "Trametinib_250" = "cadetblue4", 
+            "BEZ235_2.5" = "darkcyan", "Cabozantinib_100" = "darkcyan","Trametinib_100" = "darkcyan",
+            "BEZ235_5" = "cadetblue4",   "Cabozantinib_250" = "cadetblue4", "Trametinib_250" = "cadetblue4",
             "BEZ235_10" = "cadetblue", "Cabozantinib_500" = "cadetblue",  "Trametinib_500" = "cadetblue", 
             "BEZ235_20" = "blue",  "Cabozantinib_1000" = "blue", "Trametinib_1000" = "blue",
             "BEZ235_30" = "blue3",  "Cabozantinib_2500" = "blue3", "Trametinib_2500" = "blue3",
@@ -176,7 +187,24 @@ generate_plots <- function(plateID, l2){
             "AZD5438_5000" = "darkblue",
             "Panobinostat.5"= "cornflowerblue", "Panobinostat_1"= "darkcyan", "Panobinostat_2.5" = "cadetblue4",
             "Panobinostat_5" = "cadetblue", "Panobinostat_6.5"  = "blue",  "Panobinostat_10" = "blue3",
-            "Panobinostat_12.5" = "darkblue")
+            "Panobinostat_12.5" = "darkblue",
+            "JQ1_50" = "cornflowerblue", "JQ1_100"= "darkcyan", "JQ1_250" = "cadetblue4", "JQ1_500" = "cadetblue",
+            "JQ1_1000" = "blue", "JQ1_2500" = "blue3", "JQ1_5000" = "darkblue", 
+            "MK1775_50" = "cornflowerblue", "MK1775_100"= "darkcyan", "MK1775_175" = "cadetblue4", "MK1775_275" = "cadetblue",
+            "MK1775_375" = "blue", "MK1775_500" = "blue3", "MK1775_700" = "darkblue",
+             "MG132_1" = "cornflowerblue", "MG132_2.5" = "darkcyan", "MG132_5" = "cadetblue4","MG132_10" = "cadetblue",
+           "MG132_20" = "blue", "MG132_30" = "blue3", "MG132_50" = "darkblue", 
+             "Everolimus_50" = "cornflowerblue", "Everolimus_100"= "darkcyan", "Everolimus_250" = "cadetblue4", "Everolimus_500" = "cadetblue",
+            "Everolimus_1000" = "blue", "Everolimus_2500" = "blue3", "Everolimus_5000" = "darkblue")
+  
+#hack to deal with bortexomib_50 used once as a low dosage and another time as a high doasge
+  if("Bortezomib_1" %in% l2$treatment){
+    cols <- c(cols,  "Bortezomib_1" = "cornflowerblue", "Bortezomib_2.5"= "darkcyan", "Bortezomib_5" = "cadetblue4", "Bortezomib_10" = "cadetblue",
+              "Bortezomib_20" = "blue", "Bortezomib_30" = "blue3", "Bortezomib_50" = "darkblue")  
+    } else {
+    cols <- c(cols,  "Bortezomib_50" = "cornflowerblue", "Bortezomib_100"= "darkcyan", "Bortezomib_250" = "cadetblue4", "Bortezomib_500" = "cadetblue",
+              "Bortezomib_1000" = "blue", "Bortezomib_2500" = "blue3", "Bortezomib_5000" = "darkblue")
+  }
   
   p_n <- ggplot(l2, aes(x = elapsed_minutes, y = n, color = factor(field))) +
     geom_path() +
@@ -227,24 +255,51 @@ generate_plots <- function(plateID, l2){
   p_n_t_T0
   
   #summarize each well and group plots by drug
-  l2_mean <- l2 %>%
-    group_by(well, elapsed_minutes, treatment, drugs, Drug1Concentration) %>%
-    summarise(cell_count_norm_T0 = mean(cell_count_norm_T0),
-              n = mean(n))
+  l2_control_mean <- l2 %>%
+    filter(treatment == "vehicle") %>%
+    group_by(elapsed_minutes) %>%
+    summarise(cell_count_norm_T0_control = mean(cell_count_norm_T0),
+              n_control = mean(n),
+              G1_proportion_control = mean(G1_proportion)) 
 
-      p_n_t_T0_mean <- ggplot(l2_mean, aes(x = elapsed_minutes, y = cell_count_norm_T0, color = treatment, group = interaction(well, Drug1Concentration))) +
+    l2_mean <- l2 %>%
+      filter(!treatment == "vehicle") %>%
+    mutate(treatment = fct_drop(treatment)) %>%
+    group_by(elapsed_minutes, treatment, drugs, Drug1Concentration) %>%
+    summarise(cell_count_norm_T0 = mean(cell_count_norm_T0),
+              n = mean(n),
+              G1_proportion = mean(G1_proportion)) %>%
+      left_join(l2_control_mean, by = "elapsed_minutes")
+    
+
+  p_n_t_T0_mean <- ggplot(l2_mean, aes(x = elapsed_minutes, y = cell_count_norm_T0, color = treatment, group = Drug1Concentration)) +
     geom_path() +
+    geom_path(aes(y = cell_count_norm_T0_control), color = "red")+
     scale_y_continuous(trans = 'log2') +
-      scale_color_manual(values = cols) +
+    scale_color_manual(values = cols) +
     labs(title = "Cell counts for each treatment (T0 normed)",
          subtitle = "organized by treatment and dosage",
          xlab ="minutes",
          ylab = "cell count (log2 spacing)") +
-    guides(color = guide_legend(ncol = 1)) +
+    guides(color = "none") +
     facet_wrap(~drugs, ncol = 6)+
     theme(strip.text = element_text(size = 5)) +
-      theme_bw()
+    theme_bw()
   p_n_t_T0_mean
+  
+  p_G1_t_mean <- ggplot(l2_mean, aes(x = elapsed_minutes, y = G1_proportion, color = treatment, group = Drug1Concentration)) +
+    geom_path() +
+    scale_color_manual(values = cols) +
+    labs(title = "G1 proportion for each treatment",
+         subtitle = "organized by treatment and dosage",
+         xlab ="minutes",
+         ylab = "G1 proportion") +
+    guides(color = "none") +
+    facet_wrap(~drugs, ncol = 6)+
+    theme(strip.text = element_text(size = 5)) +
+    theme_bw()
+  p_G1_t_mean
+  
   
   p_CC <- ggplot(l2, aes(x = elapsed_minutes, y = Nuclei_PI_CC_mean_intensity, color = factor(field))) +
     geom_path() +
@@ -316,7 +371,7 @@ generate_plots <- function(plateID, l2){
   
   df <- l1 %>%
     filter(elapsed_minutes %in% selected_timepoints) %>%
-    mutate(elapsed_hours = elapsed_minutes/60)
+    mutate(elapsed_hours = as.integer(elapsed_minutes)/60)
   
   p_densities <- ggplot(df, aes(Cell_PI_CC_mean_intensity_ratio, fill = treatment, color = treatment)) +
     geom_density(alpha = .2)+
@@ -336,19 +391,16 @@ generate_plots <- function(plateID, l2){
   #   theme_bw()
   # p
   
-  pdf(paste0("../plots/",plateID,"_cell_counts_intensities.pdf"), width = 10, height = 14)
-  print(p_n)
-  print(p_n_t)
-  print(p_n_T0)
-  print(p_n_t_T0)
+  pdf(paste0("../plots/",plateID,"_QA.pdf"), width = 10, height = 14)
   print(p_n_t_T0_mean)
-  print(p_CC)
-  print(p_CC_t)
-  print(p_cyto_CC)
-  print(p_cyto_CC_t)
-  print(p_cyto_CC_ratio)
-  print(p_cyto_CC_t_ratio)
+  print(p_G1_t_mean)
   print(p_densities)
+  print(p_n_t_T0)
+  print(p_cyto_CC_t_ratio)
+  print(p_CC_t)
+  print(p_n)
+  print(p_n_T0)
+  print(p_cyto_CC_t)
   res <- dev.off()
   
 }
@@ -407,8 +459,8 @@ compare_to_CP <- function(plateID, l2){
 ```{r visualize_data}
 
 process_plate<- function(plateID){
-  l2 <- create_level_2_data(plateID)
-  generate_plots(plateID, l2)
+  datasets <- create_level_2_data(plateID)
+  generate_plots(plateID, datasets$l1, datasets$l2)
   #compare_to_CP(plateID, l2)
 }
 
@@ -416,7 +468,7 @@ data_path <- "/home/exacloud/gscratch/HeiserLab/images/"
 pipeline_name <- "PI"
    
 #res <- map(c("AU01401", "AU01502", "AU01601","AU01602", "AU01701", "AU01702"), process_plate)
-res <- map(c("AU01401", "AU01601", "AU01701"), process_plate)
-
+res <- map(c(  "AU01901"), process_plate)
+plateID <- "AU01901"
 ```
 
