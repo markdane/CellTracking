@@ -256,14 +256,14 @@ generate_plots <- function(plateID, l1, l2){
   
   #summarize each well and group plots by drug
   l2_control_mean <- l2 %>%
-    filter(treatment == "vehicle") %>%
+    filter(treatment %in% c("vehicle", "control")) %>%
     group_by(elapsed_minutes) %>%
     summarise(cell_count_norm_T0_control = mean(cell_count_norm_T0),
               n_control = mean(n),
               G1_proportion_control = mean(G1_proportion)) 
 
     l2_mean <- l2 %>%
-      filter(!treatment == "vehicle") %>%
+    filter(!treatment %in% c("vehicle", "control")) %>%
     mutate(treatment = fct_drop(treatment)) %>%
     group_by(elapsed_minutes, treatment, drugs, Drug1Concentration) %>%
     summarise(cell_count_norm_T0 = mean(cell_count_norm_T0),
@@ -467,8 +467,9 @@ process_plate<- function(plateID){
 data_path <- "/home/exacloud/gscratch/HeiserLab/images/"
 pipeline_name <- "PI"
    
-#res <- map(c("AU01401", "AU01502", "AU01601","AU01602", "AU01701", "AU01702"), process_plate)
-res <- map(c(  "AU01901"), process_plate)
-plateID <- "AU01901"
+#res <- map(c("AU01401", "AU01601","AU01701", "AU01702"), process_plate)
+#res <- map(c("AU01901","AU02001","AU02002", "AU02101"), process_plate)
+res <- map(c("AU02301", "AU02401"), process_plate)
+
 ```
 
