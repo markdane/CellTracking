@@ -1,7 +1,8 @@
 ---
 title: "AU565 drug combination responses"
-output: 
-  html_document:
+output:
+  html_document: null
+  pdf_document: default
   code_folding: hide
 ---
 
@@ -45,7 +46,7 @@ get_l2_data <- function(plateID, data_path, pipeline_name = "PI"){
 
 data_path <- "/home/exacloud/gscratch/HeiserLab/images/"
 pipeline_name <- "PI"
-plateIDs <- c("AU01401","AU01601","AU01701","AU01702","AU01801","AU01802","AU01901","AU01902","AU02001","AU02002","AU02101","AU02301","AU02401")
+plateIDs <- c("AU01501","AU01601","AU01701","AU01702","AU01801","AU01802","AU01901","AU01902","AU02001","AU02002","AU02101","AU02301","AU02401", "AU02501")
 
 treatment_levels = c("vehicle",
                      "control",
@@ -73,8 +74,7 @@ treatment_levels = c("vehicle",
                      "AZD5438_50", "AZD5438_100", "AZD5438_250","AZD5438_500", "AZD5438_1000", "AZD5438_2500", "AZD5438_5000",
                      "Panobinostat.5", "Panobinostat_1", "Panobinostat_2.5", "Panobinostat_5" , "Panobinostat_6.5" ,  "Panobinostat_10", "Panobinostat_12.5",
                      "JQ1_50",  "JQ1_100", "JQ1_250", "JQ1_500", "JQ1_1000", "JQ1_2500", "JQ1_5000",
-                     "Bortezomib_1",  "Bortezomib_2.5", "Bortezomib_5", "Bortezomib_10", "Bortezomib_20", "Bortezomib_30", 
-                     "Bortezomib_50",  "Bortezomib_100", "Bortezomib_250", "Bortezomib_500", "Bortezomib_1000", "Bortezomib_2500", "Bortezomib_5000",
+                     "Bortezomib_1",  "Bortezomib_2.5", "Bortezomib_5", "Bortezomib_10", "Bortezomib_20", "Bortezomib_30", "Bortezomib_50", 
                      "MK1775_50", "MK1775_100", "MK1775_175","MK1775_275", "MK1775_375", "MK1775_500", "MK1775_700",
                      "MG132_1", "MG132_2.5","MG132_5","MG132_10","MG132_20","MG132_30","MG132_50",
                      "Everolimus_50","Everolimus_100","Everolimus_250","Everolimus_500","Everolimus_1000","Everolimus_2500","Everolimus_5000")
@@ -92,8 +92,7 @@ cols <- c("BEZ235_1" = "cornflowerblue", "Cabozantinib_50" = "cornflowerblue", "
           "AZD5438_500" = "cadetblue", "AZD5438_1000" = "blue", "AZD5438_2500" = "blue3",
           "AZD5438_5000" = "darkblue",
           "Bortezomib_1" = "cornflowerblue", "Bortezomib_2.5"= "darkcyan", "Bortezomib_5" = "cadetblue4",
-          "Bortezomib_10" = "cadetblue","Bortezomib_20" = "blue", "Bortezomib_30" = "blue3",
-          "Bortezomib_50" = "darkblue",
+          "Bortezomib_10" = "cadetblue","Bortezomib_20" = "blue", "Bortezomib_30" = "blue3","Bortezomib_50" = "darkblue",
           "Panobinostat.5"= "cornflowerblue", "Panobinostat_1"= "darkcyan", "Panobinostat_2.5" = "cadetblue4",
           "Panobinostat_5" = "cadetblue", "Panobinostat_6.5"  = "blue",  "Panobinostat_10" = "blue3",
           "Panobinostat_12.5" = "darkblue",
@@ -110,7 +109,28 @@ cols <- c("BEZ235_1" = "cornflowerblue", "Cabozantinib_50" = "cornflowerblue", "
 
 
 l2 <- map(plateIDs, get_l2_data, data_path = data_path) %>%
-  bind_rows()
+  bind_rows() %>%
+  filter(!(plateID == "AU01801" & drugs %in% c("Bortezomib", "MK1775")))
+
+write_csv(l2, "../tables/AU565_round2and3_level2.csv")
+
+l2_model_subset <- l2 %>%
+    mutate(treatment = paste0(Drug1, "_", Drug1Concentration)) %>%
+  select(plateID, well, field, elapsed_minutes, treatment, n, n_0, cell_count_norm_T0, G1_proportion) %>%
+  rename(cell_count = n,
+         cell_count_T0 = n_0) %>%
+    mutate(treatment = case_when(treatment == "vehicle" ~ "control",
+                               TRUE ~ as.character(treatment)),
+           cell_count_norm_T0 = round(cell_count_norm_T0, digits = 3),
+            G1_proportion = round(G1_proportion, digits = 3))
+write_csv(l2_model_subset, "../tables/AU565_round2and3_model_subset_level2.csv")
+
+l2_summary <- l2 %>% 
+  mutate(
+         drugs = case_when(drugs == "vehicle" ~ "control",
+                               TRUE ~ drugs)) %>%
+  group_by(drugs) %>%
+  summarise(Cells_quantifed = sum(n))
 
 #Combine the fields in each well at each time point
 l2_plate_mean <- l2 %>%
