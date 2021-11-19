@@ -22,38 +22,66 @@ create_level_2_data <- function(plateID, data_path = "/home/exacloud/gscratch/He
   level_1_data_path <- paste0(data_path,plateID,"/Analysis/",pipeline_name,"/",plateID,"_level_1.csv")
   level_2_data_path <- paste0(data_path,plateID,"/Analysis/",pipeline_name,"/",plateID,"_level_2.csv")
 
-    treatment_levels = c("vehicle",
-                       "control",
-                       "Lapatinib_25", "Lapatinib_50", "Lapatinib_100", "Lapatinib_250",
-                       
-                       "Palbociclib_25", "Palbociclib_50", "Palbociclib_100",  "Palbociclib_250" ,
-                       "Gemcitabine_5", "Gemcitabine_10", "Gemcitabine_17", "Gemcitabine_30",
-                       "Gemcitabine_100",
-                       "Palbociclib_25_Gemcitabine_10",
-                       "Palbociclib_100_Gemcitabine_10",
-                       "Palbociclib_250_Gemcitabine_10",
-                       "Doxorubicin_20",
-                       "Palbociclib_50_Doxorubicin_20",
-                       "Lapatinib_100_Doxorubicin_20",
-                       "Paclitaxel_2",
-                       "Paclitaxel_2_Lapatinib_100",
-                       "Paclitaxel_2_Doxorubicin_20",
-                       "Paclitaxel_2_Palbociclib_50",
-                       "Paclitaxel_2_Gemcitabine_10",
-                       "BEZ235_1", "BEZ235_2.5", "BEZ235_5", "BEZ235_10", "BEZ235_20", "BEZ235_30", "BEZ235_50",
-                       "Cabozantinib_50", "Cabozantinib_100",  "Cabozantinib_250", "Cabozantinib_500", "Cabozantinib_1000", "Cabozantinib_2500", "Cabozantinib_5000",
-                       "Trametinib_50", "Trametinib_100", "Trametinib_250", "Trametinib_500", "Trametinib_1000", 
-                       "Trametinib_2500", "Trametinib_5000",
-                       "5FU_125", "5FU_250", "5FU_400", "5FU_550", "5FU_750", "5FU_1000", "5FU_2500", 
-                       "AZD5438_50", "AZD5438_100", "AZD5438_250","AZD5438_500", "AZD5438_1000", "AZD5438_2500", "AZD5438_5000",
-                       "Panobinostat.5", "Panobinostat_1", "Panobinostat_2.5", "Panobinostat_5" , "Panobinostat_6.5" ,  "Panobinostat_10", "Panobinostat_12.5",
-                       "JQ1_50",  "JQ1_100", "JQ1_250", "JQ1_500", "JQ1_1000", "JQ1_2500", "JQ1_5000",
-                        "Bortezomib_1",  "Bortezomib_2.5", "Bortezomib_5", "Bortezomib_10", "Bortezomib_20", "Bortezomib_30", 
-                       "Bortezomib_50",  "Bortezomib_100", "Bortezomib_250", "Bortezomib_500", "Bortezomib_1000", "Bortezomib_2500", "Bortezomib_5000",
-                       "MK1775_50", "MK1775_100", "MK1775_175","MK1775_275", "MK1775_375", "MK1775_500", "MK1775_700",
-                       "MG132_1", "MG132_2.5","MG132_5","MG132_10","MG132_20","MG132_30","MG132_50",
-                       "Everolimus_50","Everolimus_100","Everolimus_250","Everolimus_500","Everolimus_1000","Everolimus_2500","Everolimus_5000")
-  
+ 
+treatment_levels = c("vehicle",
+                     "control",
+                     "Lapatinib_25", "Lapatinib_50", "Lapatinib_100", "Lapatinib_250",
+                     
+                     "Palbociclib_25", "Palbociclib_50", "Palbociclib_100",  "Palbociclib_250" ,
+                     "Gemcitabine_5", "Gemcitabine_10", "Gemcitabine_17", "Gemcitabine_30",
+                     "Gemcitabine_100",
+                     "Palbociclib_25_Gemcitabine_10",
+                     "Palbociclib_100_Gemcitabine_10",
+                     "Palbociclib_250_Gemcitabine_10",
+                     "Doxorubicin_20",
+                     "Palbociclib_50_Doxorubicin_20",
+                     "Lapatinib_100_Doxorubicin_20",
+                     "Paclitaxel_2",
+                     "Paclitaxel_2_Lapatinib_100",
+                     "Paclitaxel_2_Doxorubicin_20",
+                     "Paclitaxel_2_Palbociclib_50",
+                     "Paclitaxel_2_Gemcitabine_10",
+                     "BEZ235_1", "BEZ235_2.5", "BEZ235_5", "BEZ235_10", "BEZ235_20", "BEZ235_30", "BEZ235_50",
+                     "Cabozantinib_50", "Cabozantinib_100",  "Cabozantinib_250", "Cabozantinib_500", "Cabozantinib_1000", "Cabozantinib_2500", "Cabozantinib_5000",
+                     "Trametinib_50", "Trametinib_100", "Trametinib_250", "Trametinib_500", "Trametinib_1000", 
+                     "Trametinib_2500", "Trametinib_5000",
+                     "5FU_125", "5FU_250", "5FU_400", "5FU_550", "5FU_750", "5FU_1000", "5FU_2500", 
+                     "AZD5438_50", "AZD5438_100", "AZD5438_250","AZD5438_500", "AZD5438_1000", "AZD5438_2500", "AZD5438_5000",
+                     "Panobinostat.5", "Panobinostat_1", "Panobinostat_2.5", "Panobinostat_5" , "Panobinostat_6.5" ,  "Panobinostat_10", "Panobinostat_12.5",
+                     "JQ1_50",  "JQ1_100", "JQ1_250", "JQ1_500", "JQ1_1000", "JQ1_2500", "JQ1_5000",
+                     "Bortezomib_1",  "Bortezomib_2.5", "Bortezomib_5", "Bortezomib_10", "Bortezomib_20", "Bortezomib_30", "Bortezomib_50", 
+                     "MK1775_50", "MK1775_100", "MK1775_175","MK1775_275", "MK1775_375", "MK1775_500", "MK1775_700",
+                     "MG132_1", "MG132_2.5","MG132_5","MG132_10","MG132_20","MG132_30","MG132_50",
+                     "Everolimus_50","Everolimus_100","Everolimus_250","Everolimus_500","Everolimus_1000","Everolimus_2500","Everolimus_5000")
+
+cols <- c("BEZ235_1" = "cornflowerblue", "Cabozantinib_50" = "cornflowerblue", "Trametinib_50" = "cornflowerblue",
+          "BEZ235_2.5" = "darkcyan", "Cabozantinib_100" = "darkcyan","Trametinib_100" = "darkcyan",
+          "BEZ235_5" = "cadetblue4",   "Cabozantinib_250" = "cadetblue4", "Trametinib_250" = "cadetblue4",
+          "BEZ235_10" = "cadetblue", "Cabozantinib_500" = "cadetblue",  "Trametinib_500" = "cadetblue", 
+          "BEZ235_20" = "blue",  "Cabozantinib_1000" = "blue", "Trametinib_1000" = "blue",
+          "BEZ235_30" = "blue3",  "Cabozantinib_2500" = "blue3", "Trametinib_2500" = "blue3",
+          "BEZ235_50" = "darkblue", "Cabozantinib_5000" = "darkblue", "Trametinib_5000" = "darkblue",
+          "5FU_125" = "cornflowerblue", "5FU_250"= "darkcyan", "5FU_400" = "cadetblue4", "5FU_550" = "cadetblue",
+          "5FU_750" = "blue", "5FU_1000" = "blue3", "5FU_2500" = "darkblue", 
+          "AZD5438_50"= "cornflowerblue", "AZD5438_100"= "darkcyan", "AZD5438_250" = "cadetblue4",
+          "AZD5438_500" = "cadetblue", "AZD5438_1000" = "blue", "AZD5438_2500" = "blue3",
+          "AZD5438_5000" = "darkblue",
+          "Bortezomib_1" = "cornflowerblue", "Bortezomib_2.5"= "darkcyan", "Bortezomib_5" = "cadetblue4",
+          "Bortezomib_10" = "cadetblue","Bortezomib_20" = "blue", "Bortezomib_30" = "blue3","Bortezomib_50" = "darkblue",
+          "Panobinostat.5"= "cornflowerblue", "Panobinostat_1"= "darkcyan", "Panobinostat_2.5" = "cadetblue4",
+          "Panobinostat_5" = "cadetblue", "Panobinostat_6.5"  = "blue",  "Panobinostat_10" = "blue3",
+          "Panobinostat_12.5" = "darkblue",
+          "JQ1_50" = "cornflowerblue", "JQ1_100"= "darkcyan", "JQ1_250" = "cadetblue4", "JQ1_500" = "cadetblue",
+          "JQ1_1000" = "blue", "JQ1_2500" = "blue3", "JQ1_5000" = "darkblue", 
+          "MK1775_50" = "cornflowerblue", "MK1775_100"= "darkcyan", "MK1775_175" = "cadetblue4", "MK1775_275" = "cadetblue",
+          "MK1775_375" = "blue", "MK1775_500" = "blue3", "MK1775_700" = "darkblue",
+          "MG132_1" = "cornflowerblue", "MG132_2.5" = "darkcyan", "MG132_5" = "cadetblue4","MG132_10" = "cadetblue",
+          "MG132_20" = "blue", "MG132_30" = "blue3", "MG132_50" = "darkblue",
+          "Everolimus_50" = "cornflowerblue", "Everolimus_100"= "darkcyan", "Everolimus_250" = "cadetblue4",
+          "Everolimus_500" = "cadetblue", "Everolimus_1000" = "blue", "Everolimus_2500" = "blue3",
+          "Everolimus_5000" = "darkblue")
+
+
 
   if(!file.exists(level_1_data_path)){
     
@@ -97,8 +125,8 @@ create_level_2_data <- function(plateID, data_path = "/home/exacloud/gscratch/He
              treatment =  paste(Drug1, Drug1Concentration,Drug2, Drug2Concentration, sep = "_"),
              treatment = str_remove_all(treatment, "_none|_0"),
              treatment = factor(treatment, levels = treatment_levels, ordered = TRUE),
-             cell_cycle_state = case_when(Cell_PI_CC_mean_intensity_ratio <= 1 ~"G1",
-                                          Cell_PI_CC_mean_intensity_ratio > 1 ~"S/G2")) %>%
+             cell_cycle_state = case_when(Cell_PI_CC_mean_intensity_ratio <= g1_threshold ~"G1",
+                                          Cell_PI_CC_mean_intensity_ratio > g1_threshold ~"S/G2")) %>%
       filter(!elapsed_minutes %in% c()) 
     
     write_csv(l1,level_1_data_path)
@@ -111,7 +139,7 @@ create_level_2_data <- function(plateID, data_path = "/home/exacloud/gscratch/He
                 Cell_PI_CC_mean_intensity_ratio=mean(Cell_PI_CC_mean_intensity_ratio),
                 Cell_PI_CC_max_intensity_ratio=mean(Cell_PI_CC_max_intensity_ratio),
                 Cell_PI_CC_min_intensity_ratio=mean(Cell_PI_CC_min_intensity_ratio),
-                G1_proportion = table(cell_cycle_state)[1]/n,
+                G1_proportion = table(cell_cycle_state)[["G1"]]/n,
                 .groups = "drop")
     
     #normalize to earliest time point
@@ -173,30 +201,68 @@ create_level_2_data <- function(plateID, data_path = "/home/exacloud/gscratch/He
 
 
 generate_plots <- function(plateID, l1, l2){
-  cols <- c("BEZ235_1" = "cornflowerblue", "Cabozantinib_50" = "cornflowerblue", "Trametinib_50" = "cornflowerblue",
-            "BEZ235_2.5" = "darkcyan", "Cabozantinib_100" = "darkcyan","Trametinib_100" = "darkcyan",
-            "BEZ235_5" = "cadetblue4",   "Cabozantinib_250" = "cadetblue4", "Trametinib_250" = "cadetblue4",
-            "BEZ235_10" = "cadetblue", "Cabozantinib_500" = "cadetblue",  "Trametinib_500" = "cadetblue", 
-            "BEZ235_20" = "blue",  "Cabozantinib_1000" = "blue", "Trametinib_1000" = "blue",
-            "BEZ235_30" = "blue3",  "Cabozantinib_2500" = "blue3", "Trametinib_2500" = "blue3",
-            "BEZ235_50" = "darkblue", "Cabozantinib_5000" = "darkblue", "Trametinib_5000" = "darkblue",
-            "5FU_125" = "cornflowerblue", "5FU_250"= "darkcyan", "5FU_400" = "cadetblue4", "5FU_550" = "cadetblue",
-            "5FU_750" = "blue", "5FU_1000" = "blue3", "5FU_2500" = "darkblue", 
-            "AZD5438_50"= "cornflowerblue", "AZD5438_100"= "darkcyan", "AZD5438_250" = "cadetblue4",
-            "AZD5438_500" = "cadetblue", "AZD5438_1000" = "blue", "AZD5438_2500" = "blue3",
-            "AZD5438_5000" = "darkblue",
-            "Panobinostat.5"= "cornflowerblue", "Panobinostat_1"= "darkcyan", "Panobinostat_2.5" = "cadetblue4",
-            "Panobinostat_5" = "cadetblue", "Panobinostat_6.5"  = "blue",  "Panobinostat_10" = "blue3",
-            "Panobinostat_12.5" = "darkblue",
-            "JQ1_50" = "cornflowerblue", "JQ1_100"= "darkcyan", "JQ1_250" = "cadetblue4", "JQ1_500" = "cadetblue",
-            "JQ1_1000" = "blue", "JQ1_2500" = "blue3", "JQ1_5000" = "darkblue", 
-            "MK1775_50" = "cornflowerblue", "MK1775_100"= "darkcyan", "MK1775_175" = "cadetblue4", "MK1775_275" = "cadetblue",
-            "MK1775_375" = "blue", "MK1775_500" = "blue3", "MK1775_700" = "darkblue",
-             "MG132_1" = "cornflowerblue", "MG132_2.5" = "darkcyan", "MG132_5" = "cadetblue4","MG132_10" = "cadetblue",
-           "MG132_20" = "blue", "MG132_30" = "blue3", "MG132_50" = "darkblue", 
-             "Everolimus_50" = "cornflowerblue", "Everolimus_100"= "darkcyan", "Everolimus_250" = "cadetblue4", "Everolimus_500" = "cadetblue",
-            "Everolimus_1000" = "blue", "Everolimus_2500" = "blue3", "Everolimus_5000" = "darkblue")
-  
+ 
+treatment_levels = c("vehicle",
+                     "control",
+                     "Lapatinib_25", "Lapatinib_50", "Lapatinib_100", "Lapatinib_250",
+                     
+                     "Palbociclib_25", "Palbociclib_50", "Palbociclib_100",  "Palbociclib_250" ,
+                     "Gemcitabine_5", "Gemcitabine_10", "Gemcitabine_17", "Gemcitabine_30",
+                     "Gemcitabine_100",
+                     "Palbociclib_25_Gemcitabine_10",
+                     "Palbociclib_100_Gemcitabine_10",
+                     "Palbociclib_250_Gemcitabine_10",
+                     "Doxorubicin_20",
+                     "Palbociclib_50_Doxorubicin_20",
+                     "Lapatinib_100_Doxorubicin_20",
+                     "Paclitaxel_2",
+                     "Paclitaxel_2_Lapatinib_100",
+                     "Paclitaxel_2_Doxorubicin_20",
+                     "Paclitaxel_2_Palbociclib_50",
+                     "Paclitaxel_2_Gemcitabine_10",
+                     "BEZ235_1", "BEZ235_2.5", "BEZ235_5", "BEZ235_10", "BEZ235_20", "BEZ235_30", "BEZ235_50",
+                     "Cabozantinib_50", "Cabozantinib_100",  "Cabozantinib_250", "Cabozantinib_500", "Cabozantinib_1000", "Cabozantinib_2500", "Cabozantinib_5000",
+                     "Trametinib_50", "Trametinib_100", "Trametinib_250", "Trametinib_500", "Trametinib_1000", 
+                     "Trametinib_2500", "Trametinib_5000",
+                     "5FU_125", "5FU_250", "5FU_400", "5FU_550", "5FU_750", "5FU_1000", "5FU_2500", 
+                     "AZD5438_50", "AZD5438_100", "AZD5438_250","AZD5438_500", "AZD5438_1000", "AZD5438_2500", "AZD5438_5000",
+                     "Panobinostat.5", "Panobinostat_1", "Panobinostat_2.5", "Panobinostat_5" , "Panobinostat_6.5" ,  "Panobinostat_10", "Panobinostat_12.5",
+                     "JQ1_50",  "JQ1_100", "JQ1_250", "JQ1_500", "JQ1_1000", "JQ1_2500", "JQ1_5000",
+                     "Bortezomib_1",  "Bortezomib_2.5", "Bortezomib_5", "Bortezomib_10", "Bortezomib_20", "Bortezomib_30", "Bortezomib_50", 
+                     "MK1775_50", "MK1775_100", "MK1775_175","MK1775_275", "MK1775_375", "MK1775_500", "MK1775_700",
+                     "MG132_1", "MG132_2.5","MG132_5","MG132_10","MG132_20","MG132_30","MG132_50",
+                     "Everolimus_50","Everolimus_100","Everolimus_250","Everolimus_500","Everolimus_1000","Everolimus_2500","Everolimus_5000")
+
+cols <- c("BEZ235_1" = "cornflowerblue", "Cabozantinib_50" = "cornflowerblue", "Trametinib_50" = "cornflowerblue",
+          "BEZ235_2.5" = "darkcyan", "Cabozantinib_100" = "darkcyan","Trametinib_100" = "darkcyan",
+          "BEZ235_5" = "cadetblue4",   "Cabozantinib_250" = "cadetblue4", "Trametinib_250" = "cadetblue4",
+          "BEZ235_10" = "cadetblue", "Cabozantinib_500" = "cadetblue",  "Trametinib_500" = "cadetblue", 
+          "BEZ235_20" = "blue",  "Cabozantinib_1000" = "blue", "Trametinib_1000" = "blue",
+          "BEZ235_30" = "blue3",  "Cabozantinib_2500" = "blue3", "Trametinib_2500" = "blue3",
+          "BEZ235_50" = "darkblue", "Cabozantinib_5000" = "darkblue", "Trametinib_5000" = "darkblue",
+          "5FU_125" = "cornflowerblue", "5FU_250"= "darkcyan", "5FU_400" = "cadetblue4", "5FU_550" = "cadetblue",
+          "5FU_750" = "blue", "5FU_1000" = "blue3", "5FU_2500" = "darkblue", 
+          "AZD5438_50"= "cornflowerblue", "AZD5438_100"= "darkcyan", "AZD5438_250" = "cadetblue4",
+          "AZD5438_500" = "cadetblue", "AZD5438_1000" = "blue", "AZD5438_2500" = "blue3",
+          "AZD5438_5000" = "darkblue",
+          "Bortezomib_1" = "cornflowerblue", "Bortezomib_2.5"= "darkcyan", "Bortezomib_5" = "cadetblue4",
+          "Bortezomib_10" = "cadetblue","Bortezomib_20" = "blue", "Bortezomib_30" = "blue3","Bortezomib_50" = "darkblue",
+          "Panobinostat.5"= "cornflowerblue", "Panobinostat_1"= "darkcyan", "Panobinostat_2.5" = "cadetblue4",
+          "Panobinostat_5" = "cadetblue", "Panobinostat_6.5"  = "blue",  "Panobinostat_10" = "blue3",
+          "Panobinostat_12.5" = "darkblue",
+          "JQ1_50" = "cornflowerblue", "JQ1_100"= "darkcyan", "JQ1_250" = "cadetblue4", "JQ1_500" = "cadetblue",
+          "JQ1_1000" = "blue", "JQ1_2500" = "blue3", "JQ1_5000" = "darkblue", 
+          "MK1775_50" = "cornflowerblue", "MK1775_100"= "darkcyan", "MK1775_175" = "cadetblue4", "MK1775_275" = "cadetblue",
+          "MK1775_375" = "blue", "MK1775_500" = "blue3", "MK1775_700" = "darkblue",
+          "MG132_1" = "cornflowerblue", "MG132_2.5" = "darkcyan", "MG132_5" = "cadetblue4","MG132_10" = "cadetblue",
+          "MG132_20" = "blue", "MG132_30" = "blue3", "MG132_50" = "darkblue",
+          "Everolimus_50" = "cornflowerblue", "Everolimus_100"= "darkcyan", "Everolimus_250" = "cadetblue4",
+          "Everolimus_500" = "cadetblue", "Everolimus_1000" = "blue", "Everolimus_2500" = "blue3",
+          "Everolimus_5000" = "darkblue")
+
+
+  g1_threshold <- .96
+
 #hack to deal with bortexomib_50 used once as a low dosage and another time as a high doasge
   if("Bortezomib_1" %in% l2$treatment){
     cols <- c(cols,  "Bortezomib_1" = "cornflowerblue", "Bortezomib_2.5"= "darkcyan", "Bortezomib_5" = "cadetblue4", "Bortezomib_10" = "cadetblue",
@@ -377,6 +443,7 @@ generate_plots <- function(plateID, l1, l2){
     geom_density(alpha = .2)+
           scale_color_manual(values = cols) +
               scale_fill_manual(values = cols) +
+    geom_vline(xintercept = g1_threshold)+
     facet_grid(elapsed_hours~drugs) +
     guides(fill = "none", color = "none") +
     theme_bw()
@@ -469,7 +536,7 @@ pipeline_name <- "PI"
    
 #res <- map(c("AU01401", "AU01601","AU01701", "AU01702"), process_plate)
 #res <- map(c("AU01901","AU02001","AU02002", "AU02101"), process_plate)
-res <- map(c("AU02301", "AU02401"), process_plate)
+res <- map(c("AU01501","AU01601","AU01701","AU01702","AU01801","AU01802","AU01901","AU01902","AU02001","AU02002","AU02101","AU02301","AU02401", "AU02501"), process_plate)
 
 ```
 
