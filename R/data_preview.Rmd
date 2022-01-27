@@ -17,12 +17,12 @@ library(readxl)
 
 ```{r get_data}
 
-create_level_2_data <- function(plateID, data_path = "/home/exacloud/gscratch/HeiserLab/images/", pipeline_name = "PI"){
+create_level_2_data <- function(plateID, data_path = "/home/exacloud/gscratch/HeiserLab/images/", pipeline_name = "PC"){
   
-  level_1_data_path <- paste0(data_path,plateID,"/Analysis/",pipeline_name,"/",plateID,"_level_1.csv")
-  level_2_data_path <- paste0(data_path,plateID,"/Analysis/",pipeline_name,"/",plateID,"_level_2.csv")
+  level_1_data_path <- paste0(data_path,plateID,"/Analysis/",pipeline_name,"/intermediate_files/",plateID,"_level_1.csv")
+  level_2_data_path <- paste0(data_path,plateID,"/Analysis/",pipeline_name,"/intermediate_files/",plateID,"_level_2.csv")
 
- 
+  g1_threshold <- .96
 treatment_levels = c("vehicle",
                      "control",
                      "Lapatinib_25", "Lapatinib_50", "Lapatinib_100", "Lapatinib_250",
@@ -85,26 +85,26 @@ cols <- c("BEZ235_1" = "cornflowerblue", "Cabozantinib_50" = "cornflowerblue", "
 
   if(!file.exists(level_1_data_path)){
     
-    l1 <- map(dir(paste0(data_path,plateID,"/Analysis/",pipeline_name,"/"),pattern = paste0(plateID,"_.*_level_1.csv"), full.names = TRUE), read_csv,
+    l1 <- map(dir(paste0(data_path,plateID,"/Analysis/",pipeline_name,"/intermediate_files/"),pattern = paste0(plateID,"_.*_level_1.csv"), full.names = TRUE), read_csv,
               col_types =cols(.default = "c",
                               ...1 = col_double(),
                               label...2 = col_double(),
-                              Nuclei_PI_CC_area = col_double(),
-                              Nuclei_PI_CC_eccentricity = col_double(),
-                              Nuclei_PI_CC_mean_intensity = col_double(),
-                              Nuclei_PI_CC_max_intensity = col_double(),
-                              Nuclei_PI_CC_min_intensity = col_double(),
+                              Nuclei_PC_CC_area = col_double(),
+                              Nuclei_PC_CC_eccentricity = col_double(),
+                              Nuclei_PC_CC_mean_intensity = col_double(),
+                              Nuclei_PC_CC_max_intensity = col_double(),
+                              Nuclei_PC_CC_min_intensity = col_double(),
                               image = col_double(),
                               well = col_character(),
                               field = col_double(),
                               time_slice = col_character(),
                               label...12 = col_double(),
-                              Cyto_PI_CC_mean_intensity = col_double(),
-                              Cyto_PI_CC_max_intensity = col_double(),
-                              Cyto_PI_CC_min_intensity = col_double(),
-                              Cell_PI_CC_mean_intensity_ratio = col_double(),
-                              Cell_PI_CC_max_intensity_ratio = col_double(),
-                              Cell_PI_CC_min_intensity_ratio = col_double()
+                              Cyto_PC_CC_mean_intensity = col_double(),
+                              Cyto_PC_CC_max_intensity = col_double(),
+                              Cyto_PC_CC_min_intensity = col_double(),
+                              Cell_PC_CC_mean_intensity_ratio = col_double(),
+                              Cell_PC_CC_max_intensity_ratio = col_double(),
+                              Cell_PC_CC_min_intensity_ratio = col_double()
               )) %>%
       bind_rows() %>%
       mutate(day = str_remove(time_slice, "d.*"),
@@ -125,20 +125,21 @@ cols <- c("BEZ235_1" = "cornflowerblue", "Cabozantinib_50" = "cornflowerblue", "
              treatment =  paste(Drug1, Drug1Concentration,Drug2, Drug2Concentration, sep = "_"),
              treatment = str_remove_all(treatment, "_none|_0"),
              treatment = factor(treatment, levels = treatment_levels, ordered = TRUE),
-             cell_cycle_state = case_when(Cell_PI_CC_mean_intensity_ratio <= g1_threshold ~"G1",
-                                          Cell_PI_CC_mean_intensity_ratio > g1_threshold ~"S/G2")) %>%
+             cell_cycle_state = case_when(Cell_PC_CC_mean_intensity_ratio <= g1_threshold ~"G1",
+                                          Cell_PC_CC_mean_intensity_ratio > g1_threshold ~"S/G2")) %>%
       filter(!elapsed_minutes %in% c()) 
     
     write_csv(l1,level_1_data_path)
     l2 <- l1 %>%
       group_by(well, field, elapsed_minutes, treatment, drugs, Drug1,
                Drug1Concentration, Drug2, Drug2Concentration) %>%
+      drop_na() %>%
       summarise(n = n(),
-                Nuclei_PI_CC_mean_intensity=mean(Nuclei_PI_CC_mean_intensity),
-                Cyto_PI_CC_mean_intensity=mean(Cyto_PI_CC_mean_intensity),
-                Cell_PI_CC_mean_intensity_ratio=mean(Cell_PI_CC_mean_intensity_ratio),
-                Cell_PI_CC_max_intensity_ratio=mean(Cell_PI_CC_max_intensity_ratio),
-                Cell_PI_CC_min_intensity_ratio=mean(Cell_PI_CC_min_intensity_ratio),
+                Nuclei_PC_CC_mean_intensity=mean(Nuclei_PC_CC_mean_intensity),
+                Cyto_PC_CC_mean_intensity=mean(Cyto_PC_CC_mean_intensity),
+                Cell_PC_CC_mean_intensity_ratio=mean(Cell_PC_CC_mean_intensity_ratio),
+                Cell_PC_CC_max_intensity_ratio=mean(Cell_PC_CC_max_intensity_ratio),
+                Cell_PC_CC_min_intensity_ratio=mean(Cell_PC_CC_min_intensity_ratio),
                 G1_proportion = table(cell_cycle_state)[["G1"]]/n,
                 .groups = "drop")
     
@@ -160,22 +161,22 @@ cols <- c("BEZ235_1" = "cornflowerblue", "Cabozantinib_50" = "cornflowerblue", "
                    col_types =cols(.default = "c",
                                    ...1 = col_double(),
                                    label...2 = col_double(),
-                                   Nuclei_PI_CC_area = col_double(),
-                                   Nuclei_PI_CC_eccentricity = col_double(),
-                                   Nuclei_PI_CC_mean_intensity = col_double(),
-                                   Nuclei_PI_CC_max_intensity = col_double(),
-                                   Nuclei_PI_CC_min_intensity = col_double(),
+                                   Nuclei_PC_CC_area = col_double(),
+                                   Nuclei_PC_CC_eccentricity = col_double(),
+                                   Nuclei_PC_CC_mean_intensity = col_double(),
+                                   Nuclei_PC_CC_max_intensity = col_double(),
+                                   Nuclei_PC_CC_min_intensity = col_double(),
                                    image = col_double(),
                                    well = col_character(),
                                    field = col_double(),
                                    time_slice = col_character(),
                                    label...12 = col_double(),
-                                   Cyto_PI_CC_mean_intensity = col_double(),
-                                   Cyto_PI_CC_max_intensity = col_double(),
-                                   Cyto_PI_CC_min_intensity = col_double(),
-                                   Cell_PI_CC_mean_intensity_ratio = col_double(),
-                                   Cell_PI_CC_max_intensity_ratio = col_double(),
-                                   Cell_PI_CC_min_intensity_ratio = col_double(),
+                                   Cyto_PC_CC_mean_intensity = col_double(),
+                                   Cyto_PC_CC_max_intensity = col_double(),
+                                   Cyto_PC_CC_min_intensity = col_double(),
+                                   Cell_PC_CC_mean_intensity_ratio = col_double(),
+                                   Cell_PC_CC_max_intensity_ratio = col_double(),
+                                   Cell_PC_CC_min_intensity_ratio = col_double(),
                                    cell_cycle_state = col_character()
                    ))
     l2 <- read_csv(level_2_data_path,
@@ -186,11 +187,11 @@ cols <- c("BEZ235_1" = "cornflowerblue", "Cabozantinib_50" = "cornflowerblue", "
                                     elapsed_minutes = col_double(),
                                     n = col_double(),
                                     Drug1Concentration = col_character(),
-                                    Nuclei_PI_CC_mean_intensity = col_double(),
-                                    Cyto_PI_CC_mean_intensity = col_double(),
-                                    Cell_PI_CC_mean_intensity_ratio = col_double(),
-                                    Cell_PI_CC_max_intensity_ratio = col_double(),
-                                    Cell_PI_CC_min_intensity_ratio = col_double(),
+                                    Nuclei_PC_CC_mean_intensity = col_double(),
+                                    Cyto_PC_CC_mean_intensity = col_double(),
+                                    Cell_PC_CC_mean_intensity_ratio = col_double(),
+                                    Cell_PC_CC_max_intensity_ratio = col_double(),
+                                    Cell_PC_CC_min_intensity_ratio = col_double(),
                                     cell_count_norm_T0 = col_double(),
                                     G1_proportion = col_double()
                    )) %>%
@@ -367,7 +368,7 @@ cols <- c("BEZ235_1" = "cornflowerblue", "Cabozantinib_50" = "cornflowerblue", "
   p_G1_t_mean
   
   
-  p_CC <- ggplot(l2, aes(x = elapsed_minutes, y = Nuclei_PI_CC_mean_intensity, color = factor(field))) +
+  p_CC <- ggplot(l2, aes(x = elapsed_minutes, y = Nuclei_PC_CC_mean_intensity, color = factor(field))) +
     geom_path() +
     stat_summary(fun=mean, aes(group=1), geom="line", colour="blue") +
     labs(title = "Cell cycle intensity in the nuclei, mean",
@@ -376,7 +377,7 @@ cols <- c("BEZ235_1" = "cornflowerblue", "Cabozantinib_50" = "cornflowerblue", "
     facet_wrap(~well, ncol = 6)
   p_CC
   
-  p_CC_t <- ggplot(l2, aes(x = elapsed_minutes, y = Nuclei_PI_CC_mean_intensity, color = treatment, group = interaction(field, well))) +
+  p_CC_t <- ggplot(l2, aes(x = elapsed_minutes, y = Nuclei_PC_CC_mean_intensity, color = treatment, group = interaction(field, well))) +
     geom_path() +
     stat_summary(fun=mean, aes(group=1), geom="line", colour="blue") +
     labs(title = "Cell cycle intensity in the nuclei, mean",
@@ -387,7 +388,7 @@ cols <- c("BEZ235_1" = "cornflowerblue", "Cabozantinib_50" = "cornflowerblue", "
   p_CC_t
   
   
-  p_cyto_CC <- ggplot(l2, aes(x = elapsed_minutes, y = Cyto_PI_CC_mean_intensity, color = factor(field))) +
+  p_cyto_CC <- ggplot(l2, aes(x = elapsed_minutes, y = Cyto_PC_CC_mean_intensity, color = factor(field))) +
     geom_path() +
     stat_summary(fun=mean, aes(group=1), geom="line", colour="blue") +
     labs(title = "Cell cycle intensity in the cytoplasm, mean",
@@ -396,7 +397,7 @@ cols <- c("BEZ235_1" = "cornflowerblue", "Cabozantinib_50" = "cornflowerblue", "
     facet_wrap(~well, ncol = 6)
   p_cyto_CC
   
-  p_cyto_CC_t <- ggplot(l2, aes(x = elapsed_minutes, y = Cyto_PI_CC_mean_intensity, color = treatment, group = interaction(field, well))) +
+  p_cyto_CC_t <- ggplot(l2, aes(x = elapsed_minutes, y = Cyto_PC_CC_mean_intensity, color = treatment, group = interaction(field, well))) +
     geom_path() +
     stat_summary(fun=mean, aes(group=1), geom="line", colour="blue") +
     labs(title = "Cell cycle intensity in the cytoplasm, mean",
@@ -407,7 +408,7 @@ cols <- c("BEZ235_1" = "cornflowerblue", "Cabozantinib_50" = "cornflowerblue", "
     theme(strip.text = element_text(size = 5))
   p_cyto_CC_t
   
-  p_cyto_CC_ratio <- ggplot(l2, aes(x = elapsed_minutes, y = Cell_PI_CC_mean_intensity_ratio, color = factor(field))) +
+  p_cyto_CC_ratio <- ggplot(l2, aes(x = elapsed_minutes, y = Cell_PC_CC_mean_intensity_ratio, color = factor(field))) +
     geom_path() +
     stat_summary(fun=mean, aes(group=1), geom="line", colour="blue") +
     labs(title = "Cell cycle intensity in the cytoplasm/nuclei, mean",
@@ -416,7 +417,7 @@ cols <- c("BEZ235_1" = "cornflowerblue", "Cabozantinib_50" = "cornflowerblue", "
     facet_wrap(~well, ncol = 2)
   p_cyto_CC_ratio
   
-  p_cyto_CC_t_ratio <- ggplot(l2, aes(x = elapsed_minutes, y = Cell_PI_CC_mean_intensity_ratio, color = treatment, group = interaction(field, well))) +
+  p_cyto_CC_t_ratio <- ggplot(l2, aes(x = elapsed_minutes, y = Cell_PC_CC_mean_intensity_ratio, color = treatment, group = interaction(field, well))) +
     geom_path() +
     stat_summary(fun=mean, aes(group=1), geom="line", colour="blue") +
     labs(title = "Cell cycle intensity in the cytoplasm/nuclei, mean",
@@ -439,7 +440,7 @@ cols <- c("BEZ235_1" = "cornflowerblue", "Cabozantinib_50" = "cornflowerblue", "
     filter(elapsed_minutes %in% selected_timepoints) %>%
     mutate(elapsed_hours = as.integer(elapsed_minutes)/60)
   
-  p_densities <- ggplot(df, aes(Cell_PI_CC_mean_intensity_ratio, fill = treatment, color = treatment)) +
+  p_densities <- ggplot(df, aes(Cell_PC_CC_mean_intensity_ratio, fill = treatment, color = treatment)) +
     geom_density(alpha = .2)+
           scale_color_manual(values = cols) +
               scale_fill_manual(values = cols) +
@@ -449,7 +450,7 @@ cols <- c("BEZ235_1" = "cornflowerblue", "Cabozantinib_50" = "cornflowerblue", "
     theme_bw()
   p_densities
   
-  # p <- ggplot(df, aes(Cell_PI_CC_mean_intensity_ratio, fill = elapsed_hours, color = elapsed_hours)) +
+  # p <- ggplot(df, aes(Cell_PC_CC_mean_intensity_ratio, fill = elapsed_hours, color = elapsed_hours)) +
   #   geom_density(alpha = .2)+
   #         # scale_color_manual(values = time_cols) +
   #         #     scale_fill_manual(values = cols) +
@@ -484,27 +485,27 @@ compare_to_CP <- function(plateID, l2){
     select(Metadata_Well, Metadata_Site, Count_Nuclei, Time_slice_index,elapsed_minutes)
   
   
-  l2_PI_CP <- l2 %>%
+  l2_PC_CP <- l2 %>%
     right_join(plate_CP_data, by = c("well"= "Metadata_Well", "field" = "Metadata_Site", "elapsed_minutes" = "elapsed_minutes")) 
   
-  cell_counts_PI_CP <- l2_PI_CP %>%
+  cell_counts_PC_CP <- l2_PC_CP %>%
     select(well, treatment, field, n, Count_Nuclei, elapsed_minutes) %>%
     pivot_longer(cols = c(n, Count_Nuclei), names_to = "pipeline", values_to = "Cell_count") %>%
     mutate(pipeline = case_when(pipeline =="n" ~"python_ilastik",
                                 pipeline == "Count_Nuclei" ~"CellProfiler"))
   
-  p_PI_CP <- ggplot(cell_counts_PI_CP, aes(x = elapsed_minutes, y = Cell_count, color = pipeline, shape = pipeline)) +
+  p_PC_CP <- ggplot(cell_counts_PC_CP, aes(x = elapsed_minutes, y = Cell_count, color = pipeline, shape = pipeline)) +
     geom_point(size = .5, alpha = .8) +
     theme_bw()+
     theme(strip.text.y = element_text(size = 4)) +
     facet_grid(well+treatment~field, scales = "free_y")
-  p_PI_CP
+  p_PC_CP
   
   #compare pipeline results directly
-  cell_counts_PI_CP_wide <- cell_counts_PI_CP %>%
+  cell_counts_PC_CP_wide <- cell_counts_PC_CP %>%
     pivot_wider(names_from = pipeline, values_from = Cell_count)
   
-  p_PIvsCP <- ggplot(cell_counts_PI_CP_wide, aes(x = CellProfiler, y = python_ilastik)) +
+  p_PIvsCP <- ggplot(cell_counts_PC_CP_wide, aes(x = CellProfiler, y = python_ilastik)) +
     geom_point(size = .5, alpha = .8) +
     coord_cartesian(xlim = c(0,800), ylim = c(0,800)) +
     theme_bw()+
@@ -512,7 +513,7 @@ compare_to_CP <- function(plateID, l2){
   p_PIvsCP
   
   pdf(paste0("../plots/",plateID,"_cell_count_pipeline_comparison.pdf"), height = 24)
-  print(p_PI_CP)
+  print(p_PC_CP)
   print(p_PIvsCP)
   res <- dev.off()
   
@@ -532,11 +533,12 @@ process_plate<- function(plateID){
 }
 
 data_path <- "/home/exacloud/gscratch/HeiserLab/images/"
-pipeline_name <- "PI"
+pipeline_name <- "PC"
+plateID <- "AU02001"
    
-#res <- map(c("AU01401", "AU01601","AU01701", "AU01702"), process_plate)
+res <- map(c("AU02001"), process_plate)
 #res <- map(c("AU01901","AU02001","AU02002", "AU02101"), process_plate)
-res <- map(c("AU01501","AU01601","AU01701","AU01702","AU01801","AU01802","AU01901","AU01902","AU02001","AU02002","AU02101","AU02301","AU02401", "AU02501"), process_plate)
+#res <- map(c("AU01501","AU01601","AU01701","AU01702","AU01801","AU01802","AU01901","AU01902","AU02001","AU02002","AU02101","AU02301","AU02401", "AU02501"), process_plate)
 
 ```
 

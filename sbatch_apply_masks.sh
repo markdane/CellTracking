@@ -18,8 +18,16 @@ python generate_apply_ilastik_jobs.py AU01002 &
 python generate_apply_ilastik_jobs.py AU01101 &
 python generate_apply_ilastik_jobs.py AU01102 &
 python generate_apply_ilastik_jobs.py AU01401 &
+python generate_apply_ilastik_jobs.py AU01501 &
 python generate_apply_ilastik_jobs.py AU01502 &
+python generate_apply_ilastik_jobs.py AU01801 &
+python generate_apply_ilastik_jobs.py AU01901 &
+python generate_apply_ilastik_jobs.py AU01902 &
+python generate_apply_ilastik_jobs.py AU02101 &
 python generate_apply_ilastik_jobs.py AU02301 &
 python generate_apply_ilastik_jobs.py AU02401 &
 python generate_apply_ilastik_jobs.py AU02501 &
-
+python generate_apply_ilastik_jobs.py AU02801 &
+python generate_apply_ilastik_jobs.py AU02901 &
+python generate_apply_ilastik_jobs.py AU03001 &
+python generate_apply_ilastik_jobs.py AU03101 &

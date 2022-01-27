@@ -43,3 +43,5 @@ rsconnect/
 *.tiff
 *.h5
 *.csv
+*.txt
+
