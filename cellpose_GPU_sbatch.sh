@@ -2,15 +2,10 @@
 #SBATCH --partition gpu
 #SBATCH --account HeiserLab
 #SBATCH --cpus-per-task 2
-# SBATCH --gpus-per-task 1
-#SBATCH --gres gpu:v100:1
-#SBATCH --mem 10G
+#SBATCH --gres gpu:1
+#SBATCH --mem 40G
 #SBATCH --time 23:00:00
-#SBATCH --job-name CP_AU_B
+#SBATCH --job-name 2101
+#SBATCH --array=1-24
 
-srun python AU565_Live_cell_image_segmentation.py AU01401 B1
-srun python AU565_Live_cell_image_segmentation.py AU01401 B2
-srun python AU565_Live_cell_image_segmentation.py AU01401 B3
-srun python AU565_Live_cell_image_segmentation.py AU01401 B4
-srun python AU565_Live_cell_image_segmentation.py AU01401 B5
-srun python AU565_Live_cell_image_segmentation.py AU01401 B6
+python Register_segment_for_cellpose_tracking.py AU02101 $SLURM_ARRAY_TASK_ID

@@ -16,10 +16,10 @@ library(RColorBrewer)
 ```
 
 ```{r functions}
-get_data <- function(plateID, data_path, pipeline_name = "PC", data_level = "1"){
+get_data <- function(plateID, data_path, pipeline_name = "PC2", data_level = "1"){
   data_paths <- dir(paste0(data_path, plateID, "/Analysis/",pipeline_name), pattern = paste0(".*_level_",data_level,".csv"), full.names = TRUE)
   if(length(data_paths)==0) stop(paste0("no files found at ",data_path, plateID, "/Analysis/",pipeline_name,"/"))
-  if(pipeline_name == "PC"){
+  if(str_detect(pipeline_name, "PC")){
     reporter = "NR"
   } else {
     reporter = "CC"
@@ -43,17 +43,23 @@ area_threshold_min <- 30
 area_threshold_max <- 450
 
 
-cellpose_data <- get_data(plateID = "AU02001", data_path=data_path, pipeline_name = "PC", data_level = "1") %>%
+new_data <- get_data(plateID = "AU02001", data_path=data_path, pipeline_name = "PC2", data_level = "1") %>%
   filter(Nuclei_area > area_threshold_min,
          Nuclei_area < area_threshold_max) %>%
-  count(well, field, time_slice, name = "cell_count_cellpose") %>%
+  count(well, field, time_slice, name = "cell_count_new") %>%
   arrange(time_slice) 
 
-ilastik_data <- get_data(plateID = "AU02001", data_path=data_path, pipeline_name = "PI", data_level = "1") %>%
+baseline_data <- get_data(plateID = "AU02001", data_path=data_path, pipeline_name = "PC", data_level = "1") %>%
   filter(Nuclei_area > area_threshold_min,
          Nuclei_area < area_threshold_max) %>%
-  count(well, field, time_slice, name = "cell_count_ilastik") %>%
-  arrange(time_slice)
+  count(well, field, time_slice, name = "cell_count_baseline") %>%
+  arrange(time_slice) 
+
+# ilastik_data <- get_data(plateID = "AU02001", data_path=data_path, pipeline_name = "P", data_level = "1") %>%
+#   filter(Nuclei_area > area_threshold_min,
+#          Nuclei_area < area_threshold_max) %>%
+#   count(well, field, time_slice, name = "cell_count_ilastik") %>%
+#   arrange(time_slice)
 
 cell_count_df <- inner_join(cellpose_data, ilastik_data, by = c("well", "field", "time_slice")) %>%
   arrange(well, field, time_slice) %>%
