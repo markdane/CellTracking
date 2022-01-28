@@ -18,9 +18,12 @@ python generate_ilastik_jobs.py AU01002 &
 python generate_ilastik_jobs.py AU01101 &
 python generate_ilastik_jobs.py AU01102 &
 python generate_ilastik_jobs.py AU01401 &
+python generate_ilastik_jobs.py AU01501 &
 python generate_ilastik_jobs.py AU01502 &
 python generate_ilastik_jobs.py AU99999 &
 python generate_ilastik_jobs.py AU02301 &
 python generate_ilastik_jobs.py AU02401 &
 python generate_ilastik_jobs.py AU02501 &
+python generate_ilastik_jobs.py AU02901 &
+python generate_ilastik_jobs.py AU03001 &
 

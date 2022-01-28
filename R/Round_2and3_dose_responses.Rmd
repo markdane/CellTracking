@@ -47,6 +47,7 @@ get_l2_data <- function(plateID, data_path, pipeline_name = "PI"){
 data_path <- "/home/exacloud/gscratch/HeiserLab/images/"
 pipeline_name <- "PI"
 plateIDs <- c("AU01501","AU01601","AU01701","AU01702","AU01801","AU01802","AU01901","AU01902","AU02001","AU02002","AU02101","AU02301","AU02401", "AU02501")
+#these plates need further processing , "AU02801","AU02901", "AU03001","AU03101"
 
 treatment_levels = c("vehicle",
                      "control",
@@ -110,7 +111,9 @@ cols <- c("BEZ235_1" = "cornflowerblue", "Cabozantinib_50" = "cornflowerblue", "
 
 l2 <- map(plateIDs, get_l2_data, data_path = data_path) %>%
   bind_rows() %>%
-  filter(!(plateID == "AU01801" & drugs %in% c("Bortezomib", "MK1775")))
+  filter(!(plateID == "AU01801" & drugs %in% c("Bortezomib", "MK1775"))) %>%
+    mutate(elapsed_hours = elapsed_minutes/60)
+
 
 write_csv(l2, "../tables/AU565_round2and3_level2.csv")
 
@@ -238,6 +241,46 @@ p_G1_m_rep <- ggplot(l2_mean, aes(x = elapsed_hours, y = G1_proportion, color = 
   theme(strip.text = element_text(size = 5)) +
   theme_bw()
 p_G1_m_rep
+```
+
+```{r G1_controls, fig.height=12}
+df <- l2 %>%
+      mutate(treatment = case_when(treatment == "vehicle" ~ "control",
+                               TRUE ~ as.character(treatment)),
+           cell_count_norm_T0 = round(cell_count_norm_T0, digits = 3),
+            G1_proportion = round(G1_proportion, digits = 3)) %>%
+  filter(treatment %in% c("control"))
+
+p_T0_count <- ggplot(df, aes(x = elapsed_hours, y = cell_count_norm_T0, color = interaction(well,field))) +
+  geom_path() +
+  scale_x_continuous(breaks = c(0,24, 48, 72, 96))+
+  #scale_color_manual(values = cols) +
+  labs(title = "Cell counts for all controls") +
+  xlab("hours") +
+  ylab("Cell count (T0 normed)") +
+  guides(color ="none") +
+  facet_grid(plateID~well)+
+  theme(strip.text = element_text(size = 5)) +
+  theme_bw()
+p_T0_count
+
+p_G1 <- ggplot(df, aes(x = elapsed_hours, y = G1_proportion, color = interaction(well,field))) +
+  geom_path() +
+  scale_x_continuous(breaks = c(0,24, 48, 72, 96))+
+  #scale_color_manual(values = cols) +
+  labs(title = "G1 proportion for all controls") +
+  xlab("hours") +
+  ylab("G1 proportion") +
+  guides(color ="none") +
+  facet_grid(plateID~well)+
+  theme(strip.text = element_text(size = 5)) +
+  theme_bw()
+p_G1
+
+pdf(file = "../plots/AU565_rounds2and3_controls_G1.pdf",height = 12)
+print(p_T0_count)
+print(p_G1)
+res <- dev.off()
 
 ```
 
