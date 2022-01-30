@@ -17,13 +17,39 @@ library(readxl)
 
 ```{r get_data}
 
-create_level_2_data <- function(plateID, data_path = "/home/exacloud/gscratch/HeiserLab/images/", pipeline_name = "PC"){
-  
-  level_1_data_path <- paste0(data_path,plateID,"/Analysis/",pipeline_name,"/intermediate_files/",plateID,"_level_1.csv")
-  level_2_data_path <- paste0(data_path,plateID,"/Analysis/",pipeline_name,"/intermediate_files/",plateID,"_level_2.csv")
+read_process_l1_data <- function(l1_data_path){
+  l1 <- read_csv(l1_data_path,
+                 col_types =cols(.default = "d",
+                                 well = col_character(),
+                                 time_slice = col_character(),
+                                 cell_cycle_state = col_character(),
+                                 Well = col_character(),
+                                 Cellline = col_character(),
+                                 Ligand1 = col_character(), 
+                                 Ligand1ConcentrationUnits= col_character(), 
+                                 Ligand2 = col_character(),
+                                 Ligand2ConcentrationUnits= col_character(),
+                                 Ligand3 = col_character(), 
+                                 Ligand3ConcentrationUnits= col_character(),
+                                 ECMP1 = col_character(), 
+                                 ECMP1ConcentrationUnits= col_character(),
+                                 Drug1 = col_character(), 
+                                 Drug1ConcentrationUnits= col_character(),
+                                 Drug2 = col_character(), 
+                                 Drug2ConcentrationUnits = col_character(), 
+                                 "incubation _media" = col_character(),
+                                 Endpoint_red = col_character(),
+                                 Endpoint_green = col_character(),
+                                 ligand = col_character(),
+                                 drugs = col_character(),
+                                 treatment = col_character(),
+                                 row = col_character()
+                 ))
+   return(l1)
+}
 
-  g1_threshold <- .96
-treatment_levels = c("vehicle",
+read_process_l2_data <- function(l2_data_path){
+  treatment_levels = c("vehicle",
                      "control",
                      "Lapatinib_25", "Lapatinib_50", "Lapatinib_100", "Lapatinib_250",
                      
@@ -53,58 +79,56 @@ treatment_levels = c("vehicle",
                      "MK1775_50", "MK1775_100", "MK1775_175","MK1775_275", "MK1775_375", "MK1775_500", "MK1775_700",
                      "MG132_1", "MG132_2.5","MG132_5","MG132_10","MG132_20","MG132_30","MG132_50",
                      "Everolimus_50","Everolimus_100","Everolimus_250","Everolimus_500","Everolimus_1000","Everolimus_2500","Everolimus_5000")
+  
+  l2 <- read_csv(l2_data_path,
+                 col_types = cols(.default = "c",
+                                  well = col_character(),
+                                  field = col_double(),
+                                  n_0 = col_double(),
+                                  elapsed_minutes = col_double(),
+                                  n = col_double(),
+                                  Drug1Concentration = col_character(),
+                                  Nuclei_PC_CC_mean_intensity = col_double(),
+                                  Cyto_PC_CC_mean_intensity = col_double(),
+                                  Cell_PC_CC_mean_intensity_ratio = col_double(),
+                                  Cell_PC_CC_max_intensity_ratio = col_double(),
+                                  Cell_PC_CC_min_intensity_ratio = col_double(),
+                                  cell_count_norm_T0 = col_double(),
+                                  G1_proportion = col_double()
+                 )) %>%
+    mutate(treatment = factor(treatment, levels = treatment_levels, ordered = TRUE))
+  return(l2)
+}
 
-cols <- c("BEZ235_1" = "cornflowerblue", "Cabozantinib_50" = "cornflowerblue", "Trametinib_50" = "cornflowerblue",
-          "BEZ235_2.5" = "darkcyan", "Cabozantinib_100" = "darkcyan","Trametinib_100" = "darkcyan",
-          "BEZ235_5" = "cadetblue4",   "Cabozantinib_250" = "cadetblue4", "Trametinib_250" = "cadetblue4",
-          "BEZ235_10" = "cadetblue", "Cabozantinib_500" = "cadetblue",  "Trametinib_500" = "cadetblue", 
-          "BEZ235_20" = "blue",  "Cabozantinib_1000" = "blue", "Trametinib_1000" = "blue",
-          "BEZ235_30" = "blue3",  "Cabozantinib_2500" = "blue3", "Trametinib_2500" = "blue3",
-          "BEZ235_50" = "darkblue", "Cabozantinib_5000" = "darkblue", "Trametinib_5000" = "darkblue",
-          "5FU_125" = "cornflowerblue", "5FU_250"= "darkcyan", "5FU_400" = "cadetblue4", "5FU_550" = "cadetblue",
-          "5FU_750" = "blue", "5FU_1000" = "blue3", "5FU_2500" = "darkblue", 
-          "AZD5438_50"= "cornflowerblue", "AZD5438_100"= "darkcyan", "AZD5438_250" = "cadetblue4",
-          "AZD5438_500" = "cadetblue", "AZD5438_1000" = "blue", "AZD5438_2500" = "blue3",
-          "AZD5438_5000" = "darkblue",
-          "Bortezomib_1" = "cornflowerblue", "Bortezomib_2.5"= "darkcyan", "Bortezomib_5" = "cadetblue4",
-          "Bortezomib_10" = "cadetblue","Bortezomib_20" = "blue", "Bortezomib_30" = "blue3","Bortezomib_50" = "darkblue",
-          "Panobinostat.5"= "cornflowerblue", "Panobinostat_1"= "darkcyan", "Panobinostat_2.5" = "cadetblue4",
-          "Panobinostat_5" = "cadetblue", "Panobinostat_6.5"  = "blue",  "Panobinostat_10" = "blue3",
-          "Panobinostat_12.5" = "darkblue",
-          "JQ1_50" = "cornflowerblue", "JQ1_100"= "darkcyan", "JQ1_250" = "cadetblue4", "JQ1_500" = "cadetblue",
-          "JQ1_1000" = "blue", "JQ1_2500" = "blue3", "JQ1_5000" = "darkblue", 
-          "MK1775_50" = "cornflowerblue", "MK1775_100"= "darkcyan", "MK1775_175" = "cadetblue4", "MK1775_275" = "cadetblue",
-          "MK1775_375" = "blue", "MK1775_500" = "blue3", "MK1775_700" = "darkblue",
-          "MG132_1" = "cornflowerblue", "MG132_2.5" = "darkcyan", "MG132_5" = "cadetblue4","MG132_10" = "cadetblue",
-          "MG132_20" = "blue", "MG132_30" = "blue3", "MG132_50" = "darkblue",
-          "Everolimus_50" = "cornflowerblue", "Everolimus_100"= "darkcyan", "Everolimus_250" = "cadetblue4",
-          "Everolimus_500" = "cadetblue", "Everolimus_1000" = "blue", "Everolimus_2500" = "blue3",
-          "Everolimus_5000" = "darkblue")
+create_level_2_data <- function(plateID, data_path = "/home/exacloud/gscratch/HeiserLab/images/", pipeline_name = "PC"){
+  l1_data_path <- paste0(data_path,plateID,"/Analysis/",pipeline_name,"/",plateID,"_level_1.csv")
+  l2_data_path <- paste0(data_path,plateID,"/Analysis/",pipeline_name,"/",plateID,"_level_2.csv")
 
+  g1_threshold <- .96
 
 
-  if(!file.exists(level_1_data_path)){
+  if(!file.exists(l1_data_path)){
     
-    l1 <- map(dir(paste0(data_path,plateID,"/Analysis/",pipeline_name,"/intermediate_files/"),pattern = paste0(plateID,"_.*_level_1.csv"), full.names = TRUE), read_csv,
+    l1 <- map(dir(paste0(data_path,plateID,"/Analysis/",pipeline_name),pattern = paste0(plateID,"_.*_level_1.csv"), full.names = TRUE), read_csv,
               col_types =cols(.default = "c",
-                              ...1 = col_double(),
-                              label...2 = col_double(),
-                              Nuclei_PC_CC_area = col_double(),
-                              Nuclei_PC_CC_eccentricity = col_double(),
                               Nuclei_PC_CC_mean_intensity = col_double(),
                               Nuclei_PC_CC_max_intensity = col_double(),
                               Nuclei_PC_CC_min_intensity = col_double(),
-                              image = col_double(),
                               well = col_character(),
                               field = col_double(),
+                              slice = col_double(),
                               time_slice = col_character(),
-                              label...12 = col_double(),
                               Cyto_PC_CC_mean_intensity = col_double(),
                               Cyto_PC_CC_max_intensity = col_double(),
                               Cyto_PC_CC_min_intensity = col_double(),
                               Cell_PC_CC_mean_intensity_ratio = col_double(),
                               Cell_PC_CC_max_intensity_ratio = col_double(),
-                              Cell_PC_CC_min_intensity_ratio = col_double()
+                              Cell_PC_CC_min_intensity_ratio = col_double(),
+                              begins = col_double(),
+                              ends = col_double(),
+                              parent = col_double(),
+                              length = col_double()
+                              
               )) %>%
       bind_rows() %>%
       mutate(day = str_remove(time_slice, "d.*"),
@@ -124,16 +148,18 @@ cols <- c("BEZ235_1" = "cornflowerblue", "Cabozantinib_50" = "cornflowerblue", "
              drugs = str_remove_all(drugs, "_none|_0"),
              treatment =  paste(Drug1, Drug1Concentration,Drug2, Drug2Concentration, sep = "_"),
              treatment = str_remove_all(treatment, "_none|_0"),
-             treatment = factor(treatment, levels = treatment_levels, ordered = TRUE),
+            # treatment = factor(treatment, levels = treatment_levels, ordered = TRUE),
              cell_cycle_state = case_when(Cell_PC_CC_mean_intensity_ratio <= g1_threshold ~"G1",
                                           Cell_PC_CC_mean_intensity_ratio > g1_threshold ~"S/G2")) %>%
       filter(!elapsed_minutes %in% c()) 
     
-    write_csv(l1,level_1_data_path)
+    write_csv(l1,l1_data_path)
+    
+    l1 <- read_process_l1_data(l1_data_path)
+    
     l2 <- l1 %>%
       group_by(well, field, elapsed_minutes, treatment, drugs, Drug1,
                Drug1Concentration, Drug2, Drug2Concentration) %>%
-      drop_na() %>%
       summarise(n = n(),
                 Nuclei_PC_CC_mean_intensity=mean(Nuclei_PC_CC_mean_intensity),
                 Cyto_PC_CC_mean_intensity=mean(Cyto_PC_CC_mean_intensity),
@@ -154,31 +180,14 @@ cols <- c("BEZ235_1" = "cornflowerblue", "Cabozantinib_50" = "cornflowerblue", "
       right_join(l2,by = c("well", "field")) %>%
       mutate(cell_count_norm_T0 = n/n_0)
     
-      write_csv(l2,level_2_data_path)
+      write_csv(l2,l2_data_path)
+      #Read l2 back in using the same function used when the file exists
+      l2 <- read_process_l2_data(l2_data_path)
     
   } else {
-    l1 <- read_csv(level_1_data_path,
-                   col_types =cols(.default = "c",
-                                   ...1 = col_double(),
-                                   label...2 = col_double(),
-                                   Nuclei_PC_CC_area = col_double(),
-                                   Nuclei_PC_CC_eccentricity = col_double(),
-                                   Nuclei_PC_CC_mean_intensity = col_double(),
-                                   Nuclei_PC_CC_max_intensity = col_double(),
-                                   Nuclei_PC_CC_min_intensity = col_double(),
-                                   image = col_double(),
-                                   well = col_character(),
-                                   field = col_double(),
-                                   time_slice = col_character(),
-                                   label...12 = col_double(),
-                                   Cyto_PC_CC_mean_intensity = col_double(),
-                                   Cyto_PC_CC_max_intensity = col_double(),
-                                   Cyto_PC_CC_min_intensity = col_double(),
-                                   Cell_PC_CC_mean_intensity_ratio = col_double(),
-                                   Cell_PC_CC_max_intensity_ratio = col_double(),
-                                   Cell_PC_CC_min_intensity_ratio = col_double(),
-                                   cell_cycle_state = col_character()
-                   ))
+        
+    l1 <- read_process_l1_data(l1_data_path)
+
     l2 <- read_csv(level_2_data_path,
                    col_types = cols(.default = "c",
                                     well = col_character(),
@@ -203,36 +212,36 @@ cols <- c("BEZ235_1" = "cornflowerblue", "Cabozantinib_50" = "cornflowerblue", "
 
 generate_plots <- function(plateID, l1, l2){
  
-treatment_levels = c("vehicle",
-                     "control",
-                     "Lapatinib_25", "Lapatinib_50", "Lapatinib_100", "Lapatinib_250",
-                     
-                     "Palbociclib_25", "Palbociclib_50", "Palbociclib_100",  "Palbociclib_250" ,
-                     "Gemcitabine_5", "Gemcitabine_10", "Gemcitabine_17", "Gemcitabine_30",
-                     "Gemcitabine_100",
-                     "Palbociclib_25_Gemcitabine_10",
-                     "Palbociclib_100_Gemcitabine_10",
-                     "Palbociclib_250_Gemcitabine_10",
-                     "Doxorubicin_20",
-                     "Palbociclib_50_Doxorubicin_20",
-                     "Lapatinib_100_Doxorubicin_20",
-                     "Paclitaxel_2",
-                     "Paclitaxel_2_Lapatinib_100",
-                     "Paclitaxel_2_Doxorubicin_20",
-                     "Paclitaxel_2_Palbociclib_50",
-                     "Paclitaxel_2_Gemcitabine_10",
-                     "BEZ235_1", "BEZ235_2.5", "BEZ235_5", "BEZ235_10", "BEZ235_20", "BEZ235_30", "BEZ235_50",
-                     "Cabozantinib_50", "Cabozantinib_100",  "Cabozantinib_250", "Cabozantinib_500", "Cabozantinib_1000", "Cabozantinib_2500", "Cabozantinib_5000",
-                     "Trametinib_50", "Trametinib_100", "Trametinib_250", "Trametinib_500", "Trametinib_1000", 
-                     "Trametinib_2500", "Trametinib_5000",
-                     "5FU_125", "5FU_250", "5FU_400", "5FU_550", "5FU_750", "5FU_1000", "5FU_2500", 
-                     "AZD5438_50", "AZD5438_100", "AZD5438_250","AZD5438_500", "AZD5438_1000", "AZD5438_2500", "AZD5438_5000",
-                     "Panobinostat.5", "Panobinostat_1", "Panobinostat_2.5", "Panobinostat_5" , "Panobinostat_6.5" ,  "Panobinostat_10", "Panobinostat_12.5",
-                     "JQ1_50",  "JQ1_100", "JQ1_250", "JQ1_500", "JQ1_1000", "JQ1_2500", "JQ1_5000",
-                     "Bortezomib_1",  "Bortezomib_2.5", "Bortezomib_5", "Bortezomib_10", "Bortezomib_20", "Bortezomib_30", "Bortezomib_50", 
-                     "MK1775_50", "MK1775_100", "MK1775_175","MK1775_275", "MK1775_375", "MK1775_500", "MK1775_700",
-                     "MG132_1", "MG132_2.5","MG132_5","MG132_10","MG132_20","MG132_30","MG132_50",
-                     "Everolimus_50","Everolimus_100","Everolimus_250","Everolimus_500","Everolimus_1000","Everolimus_2500","Everolimus_5000")
+# treatment_levels = c("vehicle",
+#                      "control",
+#                      "Lapatinib_25", "Lapatinib_50", "Lapatinib_100", "Lapatinib_250",
+#                      
+#                      "Palbociclib_25", "Palbociclib_50", "Palbociclib_100",  "Palbociclib_250" ,
+#                      "Gemcitabine_5", "Gemcitabine_10", "Gemcitabine_17", "Gemcitabine_30",
+#                      "Gemcitabine_100",
+#                      "Palbociclib_25_Gemcitabine_10",
+#                      "Palbociclib_100_Gemcitabine_10",
+#                      "Palbociclib_250_Gemcitabine_10",
+#                      "Doxorubicin_20",
+#                      "Palbociclib_50_Doxorubicin_20",
+#                      "Lapatinib_100_Doxorubicin_20",
+#                      "Paclitaxel_2",
+#                      "Paclitaxel_2_Lapatinib_100",
+#                      "Paclitaxel_2_Doxorubicin_20",
+#                      "Paclitaxel_2_Palbociclib_50",
+#                      "Paclitaxel_2_Gemcitabine_10",
+#                      "BEZ235_1", "BEZ235_2.5", "BEZ235_5", "BEZ235_10", "BEZ235_20", "BEZ235_30", "BEZ235_50",
+#                      "Cabozantinib_50", "Cabozantinib_100",  "Cabozantinib_250", "Cabozantinib_500", "Cabozantinib_1000", "Cabozantinib_2500", "Cabozantinib_5000",
+#                      "Trametinib_50", "Trametinib_100", "Trametinib_250", "Trametinib_500", "Trametinib_1000", 
+#                      "Trametinib_2500", "Trametinib_5000",
+#                      "5FU_125", "5FU_250", "5FU_400", "5FU_550", "5FU_750", "5FU_1000", "5FU_2500", 
+#                      "AZD5438_50", "AZD5438_100", "AZD5438_250","AZD5438_500", "AZD5438_1000", "AZD5438_2500", "AZD5438_5000",
+#                      "Panobinostat.5", "Panobinostat_1", "Panobinostat_2.5", "Panobinostat_5" , "Panobinostat_6.5" ,  "Panobinostat_10", "Panobinostat_12.5",
+#                      "JQ1_50",  "JQ1_100", "JQ1_250", "JQ1_500", "JQ1_1000", "JQ1_2500", "JQ1_5000",
+#                      "Bortezomib_1",  "Bortezomib_2.5", "Bortezomib_5", "Bortezomib_10", "Bortezomib_20", "Bortezomib_30", "Bortezomib_50", 
+#                      "MK1775_50", "MK1775_100", "MK1775_175","MK1775_275", "MK1775_375", "MK1775_500", "MK1775_700",
+#                      "MG132_1", "MG132_2.5","MG132_5","MG132_10","MG132_20","MG132_30","MG132_50",
+#                      "Everolimus_50","Everolimus_100","Everolimus_250","Everolimus_500","Everolimus_1000","Everolimus_2500","Everolimus_5000")
 
 cols <- c("BEZ235_1" = "cornflowerblue", "Cabozantinib_50" = "cornflowerblue", "Trametinib_50" = "cornflowerblue",
           "BEZ235_2.5" = "darkcyan", "Cabozantinib_100" = "darkcyan","Trametinib_100" = "darkcyan",
@@ -321,52 +330,52 @@ cols <- c("BEZ235_1" = "cornflowerblue", "Cabozantinib_50" = "cornflowerblue", "
     theme(strip.text = element_text(size = 5))
   p_n_t_T0
   
-  #summarize each well and group plots by drug
-  l2_control_mean <- l2 %>%
-    filter(treatment %in% c("vehicle", "control")) %>%
-    group_by(elapsed_minutes) %>%
-    summarise(cell_count_norm_T0_control = mean(cell_count_norm_T0),
-              n_control = mean(n),
-              G1_proportion_control = mean(G1_proportion)) 
-
-    l2_mean <- l2 %>%
-    filter(!treatment %in% c("vehicle", "control")) %>%
-    mutate(treatment = fct_drop(treatment)) %>%
-    group_by(elapsed_minutes, treatment, drugs, Drug1Concentration) %>%
-    summarise(cell_count_norm_T0 = mean(cell_count_norm_T0),
-              n = mean(n),
-              G1_proportion = mean(G1_proportion)) %>%
-      left_join(l2_control_mean, by = "elapsed_minutes")
-    
-
-  p_n_t_T0_mean <- ggplot(l2_mean, aes(x = elapsed_minutes, y = cell_count_norm_T0, color = treatment, group = Drug1Concentration)) +
-    geom_path() +
-    geom_path(aes(y = cell_count_norm_T0_control), color = "red")+
-    scale_y_continuous(trans = 'log2') +
-    scale_color_manual(values = cols) +
-    labs(title = "Cell counts for each treatment (T0 normed)",
-         subtitle = "organized by treatment and dosage",
-         xlab ="minutes",
-         ylab = "cell count (log2 spacing)") +
-    guides(color = "none") +
-    facet_wrap(~drugs, ncol = 6)+
-    theme(strip.text = element_text(size = 5)) +
-    theme_bw()
-  p_n_t_T0_mean
-  
-  p_G1_t_mean <- ggplot(l2_mean, aes(x = elapsed_minutes, y = G1_proportion, color = treatment, group = Drug1Concentration)) +
-    geom_path() +
-    scale_color_manual(values = cols) +
-    labs(title = "G1 proportion for each treatment",
-         subtitle = "organized by treatment and dosage",
-         xlab ="minutes",
-         ylab = "G1 proportion") +
-    guides(color = "none") +
-    facet_wrap(~drugs, ncol = 6)+
-    theme(strip.text = element_text(size = 5)) +
-    theme_bw()
-  p_G1_t_mean
-  
+  # #summarize each well and group plots by drug
+  # l2_control_mean <- l2 %>%
+  #   filter(treatment %in% c("vehicle", "control")) %>%
+  #   group_by(elapsed_minutes) %>%
+  #   summarise(cell_count_norm_T0_control = mean(cell_count_norm_T0),
+  #             n_control = mean(n),
+  #             G1_proportion_control = mean(G1_proportion)) 
+  # 
+  #   l2_mean <- l2 %>%
+  #   filter(!treatment %in% c("vehicle", "control")) %>%
+  #   mutate(treatment = fct_drop(treatment)) %>%
+  #   group_by(elapsed_minutes, treatment, drugs, Drug1Concentration) %>%
+  #   summarise(cell_count_norm_T0 = mean(cell_count_norm_T0),
+  #             n = mean(n),
+  #             G1_proportion = mean(G1_proportion)) %>%
+  #     left_join(l2_control_mean, by = "elapsed_minutes")
+  #   
+  # 
+  # p_n_t_T0_mean <- ggplot(l2_mean, aes(x = elapsed_minutes, y = cell_count_norm_T0, color = treatment, group = Drug1Concentration)) +
+  #   geom_path() +
+  #   geom_path(aes(y = cell_count_norm_T0_control), color = "red")+
+  #   scale_y_continuous(trans = 'log2') +
+  #   scale_color_manual(values = cols) +
+  #   labs(title = "Cell counts for each treatment (T0 normed)",
+  #        subtitle = "organized by treatment and dosage",
+  #        xlab ="minutes",
+  #        ylab = "cell count (log2 spacing)") +
+  #   guides(color = "none") +
+  #   facet_wrap(~drugs, ncol = 6)+
+  #   theme(strip.text = element_text(size = 5)) +
+  #   theme_bw()
+  # p_n_t_T0_mean
+  # 
+  # p_G1_t_mean <- ggplot(l2_mean, aes(x = elapsed_minutes, y = G1_proportion, color = treatment, group = Drug1Concentration)) +
+  #   geom_path() +
+  #   scale_color_manual(values = cols) +
+  #   labs(title = "G1 proportion for each treatment",
+  #        subtitle = "organized by treatment and dosage",
+  #        xlab ="minutes",
+  #        ylab = "G1 proportion") +
+  #   guides(color = "none") +
+  #   facet_wrap(~drugs, ncol = 6)+
+  #   theme(strip.text = element_text(size = 5)) +
+  #   theme_bw()
+  # p_G1_t_mean
+  # 
   
   p_CC <- ggplot(l2, aes(x = elapsed_minutes, y = Nuclei_PC_CC_mean_intensity, color = factor(field))) +
     geom_path() +
@@ -460,8 +469,8 @@ cols <- c("BEZ235_1" = "cornflowerblue", "Cabozantinib_50" = "cornflowerblue", "
   # p
   
   pdf(paste0("../plots/",plateID,"_QA.pdf"), width = 10, height = 14)
-  print(p_n_t_T0_mean)
-  print(p_G1_t_mean)
+  # print(p_n_t_T0_mean)
+  # print(p_G1_t_mean)
   print(p_densities)
   print(p_n_t_T0)
   print(p_cyto_CC_t_ratio)
@@ -526,19 +535,53 @@ compare_to_CP <- function(plateID, l2){
 
 ```{r visualize_data}
 
-process_plate<- function(plateID){
-  datasets <- create_level_2_data(plateID)
+process_plate<- function(plateID, ...){
+  datasets <- create_level_2_data(plateID, ...)
   generate_plots(plateID, datasets$l1, datasets$l2)
   #compare_to_CP(plateID, l2)
 }
 
 data_path <- "/home/exacloud/gscratch/HeiserLab/images/"
+data_path <- "/Users/dane/Documents/CellTrackingProjects/AU565/images/"
 pipeline_name <- "PC"
 plateID <- "AU02001"
    
-res <- map(c("AU02001"), process_plate)
+res <- map(c("AU02001"), process_plate, data_path = data_path)
 #res <- map(c("AU01901","AU02001","AU02002", "AU02101"), process_plate)
 #res <- map(c("AU01501","AU01601","AU01701","AU01702","AU01801","AU01802","AU01901","AU01902","AU02001","AU02002","AU02101","AU02301","AU02401", "AU02501"), process_plate)
 
 ```
 
+```{r lineage_plot, fig.height=12}
+
+#Use the l1 data to create lineage plots of each movie
+df <- l1 %>%
+  select(well, field, slice, time_slice, elapsed_minutes, day,hour, minute, treatment, label, begins, ends, parent, length, Drug1, Drug1Concentration, Cell_PC_CC_mean_intensity_ratio,cell_cycle_state) %>%
+  filter(field ==1) %>%
+  mutate()
+
+
+#View the generation 0 cells colored by cell state
+gen_0 <- df %>%
+  filter(parent == "0") %>%
+  arrange(length) %>%
+  mutate(label = factor(label),
+    label = fct_inorder(label))
+
+gen_0_lineages <- ggplot(gen_0, aes(x = elapsed_minutes, y = label, color = cell_cycle_state)) +
+  geom_path(size = .5) +
+  scale_color_manual(values = c("G1" = "black", "S/G2" = "red")) +
+  labs(title = "Generation 0 cells",
+       subtitle = "colored by cell cycle state") +
+  xlab("minutes") +
+  ylab("") +
+  theme_bw() +
+  theme(axis.ticks.y=element_blank(),
+        axis.text.y=element_blank()) 
+gen_0_lineages
+
+pdf(paste0("../plots/",plateID,"_lineage_plots.pdf"), height = 12)
+print(gen_0_lineages)
+res <- dev.off()
+
+```
