@@ -43,7 +43,8 @@ read_process_l1_data <- function(l1_data_path){
                                  ligand = col_character(),
                                  drugs = col_character(),
                                  treatment = col_character(),
-                                 row = col_character()
+                                 row = col_character(),
+                                 plateID = col_character()
                  ))
    return(l1)
 }
@@ -100,6 +101,39 @@ read_process_l2_data <- function(l2_data_path){
   return(l2)
 }
 
+#recursive function to return lineage
+process_tracks_file <- function(tracks_filename){
+  create_lineage <- function(x){
+    mother <- subset(tracks, label==x)$parent
+    if(mother==0) return(c(x,0))
+    #browser()
+    #print(x, mother)
+    c(x,create_lineage(mother))
+  }
+  #browser()
+  tracks <- read_csv(tracks_filename,
+                     col_types = cols(
+                       label = col_double(),
+                       begins = col_double(),
+                       ends = col_double(),
+                       parent = col_double(),
+                       length = col_double(),
+                       is_parent = col_logical()
+                     ))
+  #  slice_tail(n=10)
+  #Create a lineage column
+  #get the lineage tree and name it by the second to last cell
+  
+  tracks_lineages <- tracks %>%
+    mutate(lineage_labels = map(label, create_lineage),
+           lineage = lapply(lineage_labels, dplyr::nth,-2),
+           lineage = unlist(lineage)) %>%
+    select(plateID, well, field,  label, lineage)
+  #save this version of the filtered tracks file with lineage info
+  res <- write_csv(tracks_lineages, str_replace(tracks_filename, "tracks", "tracks_lineages"))
+  return(tracks_lineages)
+}
+    
 create_level_2_data <- function(plateID, data_path = "/home/exacloud/gscratch/HeiserLab/images/", pipeline_name = "PC"){
   l1_data_path <- paste0(data_path,plateID,"/Analysis/",pipeline_name,"/",plateID,"_level_1.csv")
   l2_data_path <- paste0(data_path,plateID,"/Analysis/",pipeline_name,"/",plateID,"_level_2.csv")
@@ -109,7 +143,7 @@ create_level_2_data <- function(plateID, data_path = "/home/exacloud/gscratch/He
 
   if(!file.exists(l1_data_path)){
     
-    l1 <- map(dir(paste0(data_path,plateID,"/Analysis/",pipeline_name),pattern = paste0(plateID,"_.*_level_1.csv"), full.names = TRUE), read_csv,
+    l1_data <- map_dfr(dir(paste0(data_path,plateID,"/Analysis/",pipeline_name),pattern = paste0(plateID,"_.*_level_1.csv"), full.names = TRUE), read_csv,
               col_types =cols(.default = "c",
                               Nuclei_PC_CC_mean_intensity = col_double(),
                               Nuclei_PC_CC_max_intensity = col_double(),
@@ -124,14 +158,14 @@ create_level_2_data <- function(plateID, data_path = "/home/exacloud/gscratch/He
                               Cell_PC_CC_mean_intensity_ratio = col_double(),
                               Cell_PC_CC_max_intensity_ratio = col_double(),
                               Cell_PC_CC_min_intensity_ratio = col_double(),
+                              label = col_double(),
                               begins = col_double(),
                               ends = col_double(),
                               parent = col_double(),
                               length = col_double()
-                              
               )) %>%
-      bind_rows() %>%
-      mutate(day = str_remove(time_slice, "d.*"),
+      mutate(plateID = plateID,
+             day = str_remove(time_slice, "d.*"),
              day = as.integer(day),
              hour = str_extract(time_slice, "[0-9]*h"),
              hour = str_remove(hour, "h"),
@@ -153,12 +187,18 @@ create_level_2_data <- function(plateID, data_path = "/home/exacloud/gscratch/He
                                           Cell_PC_CC_mean_intensity_ratio > g1_threshold ~"S/G2")) %>%
       filter(!elapsed_minutes %in% c()) 
     
+     #add in lineage tracks data
+  tracks_df <- map_dfr(dir(paste0(data_path,plateID), pattern = "tracks.csv", recursive = TRUE, full.names = TRUE),
+process_tracks_file)
+  l1 <- l1_data %>%
+    left_join(tracks_df, by = c("plateID", "well", "field", "label"))
+    
     write_csv(l1,l1_data_path)
     
     l1 <- read_process_l1_data(l1_data_path)
     
     l2 <- l1 %>%
-      group_by(well, field, elapsed_minutes, treatment, drugs, Drug1,
+      group_by(plateID, well, field, elapsed_minutes, treatment, drugs, Drug1,
                Drug1Concentration, Drug2, Drug2Concentration) %>%
       summarise(n = n(),
                 Nuclei_PC_CC_mean_intensity=mean(Nuclei_PC_CC_mean_intensity),
@@ -176,8 +216,8 @@ create_level_2_data <- function(plateID, data_path = "/home/exacloud/gscratch/He
     l2 <- l2 %>%
       filter(elapsed_minutes == earliest_time_point) %>%
       rename(n_0 = n) %>%
-      select("well", "field", "n_0") %>%
-      right_join(l2,by = c("well", "field")) %>%
+      select("plateID","well", "field", "n_0") %>%
+      right_join(l2,by = c("plateID", "well", "field")) %>%
       mutate(cell_count_norm_T0 = n/n_0)
     
       write_csv(l2,l2_data_path)
@@ -189,44 +229,13 @@ create_level_2_data <- function(plateID, data_path = "/home/exacloud/gscratch/He
     l1 <- read_process_l1_data(l1_data_path)
     l2 <- read_process_l2_data(l2_data_path)
   }
+  
+ 
   return(list(l1=l1, l2=l2))
 }
 
 
-  #recursive function to return lineage
 
-  
-  process_tracks_file <- function(tracks_filename){
-    create_lineage <- function(x){
-    mother <- subset(tracks, label==x)$parent
-    if(mother==0) return(c(x,0))
-    #browser()
-    #print(x, mother)
-    c(x,create_lineage(mother))
-  }
-    #browser()
-    tracks <- read_csv(tracks_filename,
-                       col_types = cols(
-      label = col_double(),
-      begins = col_double(),
-      ends = col_double(),
-      parent = col_double(),
-      length = col_double(),
-      is_parent = col_logical()
-    ))
-    #  slice_tail(n=10)
-    #Create a lineage column
-    #get the lineage tree and name it by the second to last cell
-
-    tracks_lineages <- tracks %>%
-      mutate(lineage_labels = map(label, create_lineage),
-             lineage = lapply(lineage_labels, dplyr::nth,-2),
-             lineage = unlist(lineage)) %>%
-      select(-lineage_labels)
-    #save this version of the filtered tracks file with lineage info
-    res <- write_csv(tracks_lineages, str_replace(tracks_filename, "tracks", "tracks_lineages"))
-    }
-    
 
 generate_plots <- function(plateID, l1, l2){
  
@@ -556,7 +565,7 @@ compare_to_CP <- function(plateID, l2){
 process_plate<- function(plateID, ...){
   datasets <- create_level_2_data(plateID, data_path = data_path, ...)
   #process track files
-  res <- map(dir(paste0(data_path,plateID), pattern = "tracks.csv", recursive = TRUE, full.names = TRUE), process_tracks_file)
+  tracks_df <- map(dir(paste0(data_path,plateID), pattern = "tracks.csv", recursive = TRUE, full.names = TRUE), process_tracks_file)
   generate_plots(plateID, datasets$l1, datasets$l2)
   generate_lineage_plots(plateID, datasets$l1, datasets$l2)
  #compare_to_CP(plateID, l2)
@@ -578,8 +587,8 @@ res <- map(c("AU02001"), process_plate, data_path = data_path)
 
 ```{r lineage_plot, fig.height=12}
 
-generate_lineage_plots <- function(plateID, l1, l2))
-#Use the l1 data to create lineage plots of each movie
+generate_lineage_plots <- function(plateID, l1, l2){
+  #Use the l1 data to create lineage plots of each movie
 df <- l1 %>%
   select(well, field, slice, time_slice, elapsed_minutes, day,hour, minute, treatment, label, begins, ends, parent, length, Drug1, Drug1Concentration, Cell_PC_CC_mean_intensity_ratio,cell_cycle_state) %>%
   filter(field ==1) %>%
@@ -608,5 +617,7 @@ gen_0_lineages
 pdf(paste0("../plots/",plateID,"_lineage_plots.pdf"), height = 12)
 print(gen_0_lineages)
 res <- dev.off()
+
+}
 
 ```
