@@ -565,7 +565,6 @@ compare_to_CP <- function(plateID, l2){
 process_plate<- function(plateID, ...){
   datasets <- create_level_2_data(plateID, data_path = data_path, ...)
   #process track files
-  tracks_df <- map(dir(paste0(data_path,plateID), pattern = "tracks.csv", recursive = TRUE, full.names = TRUE), process_tracks_file)
   generate_plots(plateID, datasets$l1, datasets$l2)
   generate_lineage_plots(plateID, datasets$l1, datasets$l2)
  #compare_to_CP(plateID, l2)
@@ -589,33 +588,69 @@ res <- map(c("AU02001"), process_plate, data_path = data_path)
 
 generate_lineage_plots <- function(plateID, l1, l2){
   #Use the l1 data to create lineage plots of each movie
-df <- l1 %>%
-  select(well, field, slice, time_slice, elapsed_minutes, day,hour, minute, treatment, label, begins, ends, parent, length, Drug1, Drug1Concentration, Cell_PC_CC_mean_intensity_ratio,cell_cycle_state) %>%
-  filter(field ==1) %>%
-  mutate()
+t0_lineages <- l1 %>%
+  filter(slice == 0) %>%
+  pull(lineage)
 
+# df_t0_cells <- l1 %>%
+#   select(plateID, well, field, slice, time_slice, elapsed_minutes, day,hour, minute, treatment, label, begins, ends, parent, length, lineage, Drug1, Drug1Concentration, Cell_PC_CC_mean_intensity_ratio,cell_cycle_state) %>%
+#   filter(field ==1,
+#          label %in% t0_lineages) %>%
+#   arrange(length) %>%
+#   mutate(label = factor(label),
+#          label = fct_inorder(label)) 
 
-#View the generation 0 cells colored by cell state
-gen_0 <- df %>%
-  filter(parent == "0") %>%
-  arrange(length) %>%
-  mutate(label = factor(label),
-    label = fct_inorder(label))
+# #View the generation 0 cells colored by cell state
+# p_gen_0_cells <- ggplot(df_t0_cells, aes(x = elapsed_minutes, y = label, color = cell_cycle_state)) +
+#   geom_path(size = .5) +
+#   scale_color_manual(values = c("G1" = "black", "S/G2" = "red")) +
+#   labs(title = "Generation 0 cells",
+#        subtitle = "colored by cell cycle state") +
+#   xlab("minutes") +
+#   ylab("") +
+#   theme_bw() +
+#   theme(axis.ticks.y=element_blank(),
+#         axis.text.y=element_blank()) 
+# p_gen_0_cells
 
-gen_0_lineages <- ggplot(gen_0, aes(x = elapsed_minutes, y = label, color = cell_cycle_state)) +
-  geom_path(size = .5) +
-  scale_color_manual(values = c("G1" = "black", "S/G2" = "red")) +
-  labs(title = "Generation 0 cells",
-       subtitle = "colored by cell cycle state") +
-  xlab("minutes") +
-  ylab("") +
-  theme_bw() +
-  theme(axis.ticks.y=element_blank(),
-        axis.text.y=element_blank()) 
-gen_0_lineages
+#make a complete lineage tree diagram
+df_lineage_labels <- l1 %>%
+  filter(lineage %in%t0_lineages) %>%
+  arrange(lineage) %>%
+  mutate(lineage = factor(lineage),
+         lineage = fct_inorder(lineage),
+         lineage_label = paste0(lineage,"_",label))
+# %>%
+#   filter(!(begins <3 & length < 6))
 
-pdf(paste0("../plots/",plateID,"_lineage_plots.pdf"), height = 12)
-print(gen_0_lineages)
+# p_lineages_paths <- ggplot(df_lineage_labels, aes(x = elapsed_minutes, y = lineage_label, group = label, color = lineage)) +
+#   geom_path() +
+#   scale_color_manual(values=rep(brewer.pal(8,"Dark2"),times=10)) +
+#   guides(color = "none") +
+#   theme_classic() +
+#   theme(axis.text.y = element_blank())
+# p_lineages_paths
+
+p_lineages_state <- ggplot(df_lineage_labels, aes(x = elapsed_minutes, y = lineage_label, group = label, fill = lineage, color = cell_cycle_state)) +
+  #geom_path() +
+  geom_point(size = 1, shape = 21, stroke = .1)+
+ # geom_vline(xintercept = 2460, color = "lightgray") +
+  scale_fill_manual(values=rep(brewer.pal(8,"Dark2"),times=200)) +
+  scale_color_manual(values = c("G1" = "transparent", "S/G2" = "black"))+
+  guides(color = "none", fill = "none") +
+  labs(title = paste("T0 lineages -",unique(df_lineage_labels$Drug1),"field",unique(df_lineage_labels$field)),
+       subtitle = "S/G2 shown with black outline") +
+  ylab("Cells colored by lineage") +
+  theme_classic() +
+  theme(axis.text.y = element_blank(),
+        axis.line.y = element_blank(),
+        axis.ticks.y = element_blank()) 
+p_lineages_state
+
+pdf(paste0("../plots/",plateID,"_lineage_plots.pdf"), height = 30)
+#print(p_gen_0_cells)
+#print(p_lineages_paths)
+print(p_lineages_state)
 res <- dev.off()
 
 }
