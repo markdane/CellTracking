@@ -5,7 +5,7 @@
 #SBATCH --gres gpu:1
 #SBATCH --mem 40G
 #SBATCH --time 23:00:00
-#SBATCH --job-name 2101
-#SBATCH --array=1-24
+#SBATCH --job-name 2001
+#SBATCH --array=13-14
 
-python Register_segment_for_cellpose_tracking.py AU02101 $SLURM_ARRAY_TASK_ID
+python /home/exacloud/gscratch/HeiserLab/software/image_analysis_pipelines/AU565/python/Live_cell_imaging_cellpose_KIT.py AU02001 $SLURM_ARRAY_TASK_ID
