@@ -138,11 +138,11 @@ create_level_2_data <- function(plateID, data_path = "/home/exacloud/gscratch/He
   l1_data_path <- paste0(data_path,plateID,"/Analysis/",pipeline_name,"/",plateID,"_level_1.csv")
   l2_data_path <- paste0(data_path,plateID,"/Analysis/",pipeline_name,"/",plateID,"_level_2.csv")
 
-  g1_threshold <- .96
+  g1_threshold <- .82
 
 
   if(!file.exists(l1_data_path)){
-    
+    print(paste("creating new level 1 file for",plateID))
     l1_data <- map_dfr(dir(paste0(data_path,plateID,"/Analysis/",pipeline_name),pattern = paste0(plateID,"_.*_level_1.csv"), full.names = TRUE), read_csv,
               col_types =cols(.default = "c",
                               Nuclei_PC_CC_mean_intensity = col_double(),
@@ -188,7 +188,7 @@ create_level_2_data <- function(plateID, data_path = "/home/exacloud/gscratch/He
       filter(!elapsed_minutes %in% c()) 
     
      #add in lineage tracks data
-  tracks_df <- map_dfr(dir(paste0(data_path,plateID), pattern = "tracks.csv", recursive = TRUE, full.names = TRUE),
+  tracks_df <- map_dfr(dir(paste0(data_path, plateID), pattern = "tracks.csv", recursive = TRUE, full.names = TRUE),
 process_tracks_file)
   l1 <- l1_data %>%
     left_join(tracks_df, by = c("plateID", "well", "field", "label"))
@@ -563,7 +563,9 @@ compare_to_CP <- function(plateID, l2){
 ```{r visualize_data}
 
 process_plate<- function(plateID, ...){
-  datasets <- create_level_2_data(plateID, data_path = data_path, ...)
+  datasets <- create_level_2_data(plateID, data_path = data_path)
+  #datasets <- create_level_2_data(plateID, data_path = data_path)
+
   #process track files
   generate_plots(plateID, datasets$l1, datasets$l2)
   generate_lineage_plots(plateID, datasets$l1, datasets$l2)
@@ -588,9 +590,7 @@ res <- map(c("AU02001"), process_plate, data_path = data_path)
 
 generate_lineage_plots <- function(plateID, l1, l2){
   #Use the l1 data to create lineage plots of each movie
-t0_lineages <- l1 %>%
-  filter(slice == 0) %>%
-  pull(lineage)
+
 
 # df_t0_cells <- l1 %>%
 #   select(plateID, well, field, slice, time_slice, elapsed_minutes, day,hour, minute, treatment, label, begins, ends, parent, length, lineage, Drug1, Drug1Concentration, Cell_PC_CC_mean_intensity_ratio,cell_cycle_state) %>%
@@ -613,13 +613,22 @@ t0_lineages <- l1 %>%
 #         axis.text.y=element_blank()) 
 # p_gen_0_cells
 
-#make a complete lineage tree diagram
-df_lineage_labels <- l1 %>%
-  filter(lineage %in%t0_lineages) %>%
-  arrange(lineage) %>%
-  mutate(lineage = factor(lineage),
-         lineage = fct_inorder(lineage),
-         lineage_label = paste0(lineage,"_",label))
+# #make a complete lineage tree diagram
+# df_lineage_labels <- l1 %>%
+#   filter(lineage %in%t0_lineages) %>%
+#   arrange(lineage) %>%
+#   mutate(lineage = factor(lineage),
+#          lineage = fct_inorder(lineage),
+#          lineage_label = paste0(lineage,"_",label))
+# 
+# track_lengths<- l1 %>%
+#   group_by(well, field, label) %>%
+#   summarise(track_length = unique(length))
+# 
+# mean_track_length <- track_lengths %>%
+#   group_by(well, field) %>%
+#   summarise(mean_track_length = mean(track_length))
+
 # %>%
 #   filter(!(begins <3 & length < 6))
 
@@ -630,8 +639,23 @@ df_lineage_labels <- l1 %>%
 #   theme_classic() +
 #   theme(axis.text.y = element_blank())
 # p_lineages_paths
-
-p_lineages_state <- ggplot(df_lineage_labels, aes(x = elapsed_minutes, y = lineage_label, group = label, fill = lineage, color = cell_cycle_state)) +
+create_lineage_pdf <- function(df, pID, wll, fld){
+  df_plateID_well_field <- df %>%
+    filter(plateID == pID,
+           well ==  wll,
+           field == fld)
+  
+  t0_lineages <- df_plateID_well_field %>%
+  filter(slice == 0) %>%
+  pull(lineage)
+  #make a complete lineage tree diagram
+df_lineage_labels <- df_plateID_well_field %>%
+ # filter(lineage %in%t0_lineages) %>%
+  arrange(lineage) %>%
+  mutate(lineage = factor(lineage),
+         lineage = fct_inorder(lineage),
+         lineage_label = paste0(lineage,"_",label))
+  p_lineages_state <- ggplot(df_lineage_labels, aes(x = elapsed_minutes, y = lineage_label, group = label, fill = lineage, color = cell_cycle_state)) +
   #geom_path() +
   geom_point(size = 1, shape = 21, stroke = .1)+
  # geom_vline(xintercept = 2460, color = "lightgray") +
@@ -647,12 +671,18 @@ p_lineages_state <- ggplot(df_lineage_labels, aes(x = elapsed_minutes, y = linea
         axis.ticks.y = element_blank()) 
 p_lineages_state
 
-pdf(paste0("../plots/",plateID,"_lineage_plots.pdf"), height = 30)
+pdf(paste0("../plots/",plateID,"_",wll,"_", fld,"_lineage_plot.pdf"), height = 30)
 #print(p_gen_0_cells)
 #print(p_lineages_paths)
 print(p_lineages_state)
 res <- dev.off()
-
+}
+res <- create_lineage_pdf(l1, plateID, "A1", 1)
+res <- create_lineage_pdf(l1, plateID, "A1", 2)
+res <- create_lineage_pdf(l1, plateID, "C1", 1)
+res <- create_lineage_pdf(l1, plateID, "C1", 2)
+res <- create_lineage_pdf(l1, plateID, "C2", 1)
+res <- create_lineage_pdf(l1, plateID, "C2", 2)
 }
 
 ```
