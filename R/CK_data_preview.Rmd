@@ -5,12 +5,13 @@ output:
   code_folding: hide
 ---
 
-```{r setup, include=FALSE, cache=FALSE}
-knitr::opts_chunk$set(echo = FALSE)
+```{r setup, include=FAlSe, cache=FAlSe}
+knitr::opts_chunk$set(echo = FAlSe)
 
 library(tidyverse)
 library(RColorBrewer)
 library(readxl)
+library(janitor)
 
 ```
 
@@ -25,26 +26,26 @@ read_process_l1_data <- function(l1_data_path){
                                  cell_cycle_state = col_character(),
                                  Well = col_character(),
                                  Cellline = col_character(),
-                                 Ligand1 = col_character(), 
-                                 Ligand1ConcentrationUnits= col_character(), 
-                                 Ligand2 = col_character(),
-                                 Ligand2ConcentrationUnits= col_character(),
-                                 Ligand3 = col_character(), 
-                                 Ligand3ConcentrationUnits= col_character(),
+                                 ligand1 = col_character(), 
+                                 ligand1ConcentrationUnits= col_character(), 
+                                 ligand2 = col_character(),
+                                 ligand2ConcentrationUnits= col_character(),
+                                 ligand3 = col_character(), 
+                                 ligand3ConcentrationUnits= col_character(),
                                  ECMP1 = col_character(), 
                                  ECMP1ConcentrationUnits= col_character(),
                                  Drug1 = col_character(), 
-                                 Drug1ConcentrationUnits= col_character(),
-                                 Drug2 = col_character(), 
-                                 Drug2ConcentrationUnits = col_character(), 
+                                 rug1ConcentrationUnits= col_character(),
+                                 drug2 = col_character(), 
+                                 drug2ConcentrationUnits = col_character(), 
                                  "incubation _media" = col_character(),
-                                 Endpoint_red = col_character(),
-                                 Endpoint_green = col_character(),
+                                 endpoint_red = col_character(),
+                                 endpoint_green = col_character(),
                                  ligand = col_character(),
                                  drugs = col_character(),
                                  treatment = col_character(),
                                  row = col_character(),
-                                 plateID = col_character()
+                                 plateId = col_character()
                  ))
    return(l1)
 }
@@ -68,18 +69,18 @@ read_process_l2_data <- function(l2_data_path){
                      "Paclitaxel_2_Doxorubicin_20",
                      "Paclitaxel_2_Palbociclib_50",
                      "Paclitaxel_2_Gemcitabine_10",
-                     "BEZ235_1", "BEZ235_2.5", "BEZ235_5", "BEZ235_10", "BEZ235_20", "BEZ235_30", "BEZ235_50",
+                     "BeZ235_1", "BeZ235_2.5", "BeZ235_5", "BeZ235_10", "BeZ235_20", "BeZ235_30", "BeZ235_50",
                      "Cabozantinib_50", "Cabozantinib_100",  "Cabozantinib_250", "Cabozantinib_500", "Cabozantinib_1000", "Cabozantinib_2500", "Cabozantinib_5000",
                      "Trametinib_50", "Trametinib_100", "Trametinib_250", "Trametinib_500", "Trametinib_1000", 
                      "Trametinib_2500", "Trametinib_5000",
                      "5FU_125", "5FU_250", "5FU_400", "5FU_550", "5FU_750", "5FU_1000", "5FU_2500", 
-                     "AZD5438_50", "AZD5438_100", "AZD5438_250","AZD5438_500", "AZD5438_1000", "AZD5438_2500", "AZD5438_5000",
+                     "AZd5438_50", "AZd5438_100", "AZd5438_250","AZd5438_500", "AZd5438_1000", "AZd5438_2500", "AZd5438_5000",
                      "Panobinostat.5", "Panobinostat_1", "Panobinostat_2.5", "Panobinostat_5" , "Panobinostat_6.5" ,  "Panobinostat_10", "Panobinostat_12.5",
                      "JQ1_50",  "JQ1_100", "JQ1_250", "JQ1_500", "JQ1_1000", "JQ1_2500", "JQ1_5000",
                      "Bortezomib_1",  "Bortezomib_2.5", "Bortezomib_5", "Bortezomib_10", "Bortezomib_20", "Bortezomib_30", "Bortezomib_50", 
                      "MK1775_50", "MK1775_100", "MK1775_175","MK1775_275", "MK1775_375", "MK1775_500", "MK1775_700",
                      "MG132_1", "MG132_2.5","MG132_5","MG132_10","MG132_20","MG132_30","MG132_50",
-                     "Everolimus_50","Everolimus_100","Everolimus_250","Everolimus_500","Everolimus_1000","Everolimus_2500","Everolimus_5000")
+                     "everolimus_50","everolimus_100","everolimus_250","everolimus_500","everolimus_1000","everolimus_2500","everolimus_5000")
   
   l2 <- read_csv(l2_data_path,
                  col_types = cols(.default = "c",
@@ -88,7 +89,7 @@ read_process_l2_data <- function(l2_data_path){
                                   n_0 = col_double(),
                                   elapsed_minutes = col_double(),
                                   n = col_double(),
-                                  Drug1Concentration = col_character(),
+                                  drug1Concentration = col_character(),
                                   Nuclei_PC_CC_mean_intensity = col_double(),
                                   Cyto_PC_CC_mean_intensity = col_double(),
                                   Cell_PC_CC_mean_intensity_ratio = col_double(),
@@ -97,7 +98,7 @@ read_process_l2_data <- function(l2_data_path){
                                   cell_count_norm_T0 = col_double(),
                                   G1_proportion = col_double()
                  )) %>%
-    mutate(treatment = factor(treatment, levels = treatment_levels, ordered = TRUE))
+    mutate(treatment = factor(treatment, levels = treatment_levels, ordered = TRUe))
   return(l2)
 }
 
@@ -128,43 +129,126 @@ process_tracks_file <- function(tracks_filename){
     mutate(lineage_labels = map(label, create_lineage),
            lineage = lapply(lineage_labels, dplyr::nth,-2),
            lineage = unlist(lineage)) %>%
-    select(plateID, well, field,  label, lineage)
+    select(plateId, well, field,  label, lineage)
   #save this version of the filtered tracks file with lineage info
   res <- write_csv(tracks_lineages, str_replace(tracks_filename, "tracks", "tracks_lineages"))
   return(tracks_lineages)
 }
     
-create_level_2_data <- function(plateID, data_path = "/home/exacloud/gscratch/HeiserLab/images/", pipeline_name = "CK"){
-  l1_data_path <- paste0(data_path,plateID,"/Analysis/",pipeline_name,"/",plateID,"_level_1.csv")
-  l2_data_path <- paste0(data_path,plateID,"/Analysis/",pipeline_name,"/",plateID,"_level_2.csv")
+create_level_2_data <- function(plateId, data_path = "/home/exacloud/gscratch/Heiserlab/images/", pipeline_name = "CK"){
+  l1_data_path <- paste0(data_path,plateId,"/Analysis/",pipeline_name,"/",plateId,"_level_1.csv")
+  l2_data_path <- paste0(data_path,plateId,"/Analysis/",pipeline_name,"/",plateId,"_level_2.csv")
 
   g1_threshold <- .82
 
 
   if(!file.exists(l1_data_path)){
     print(paste("creating new level 1 file for",plateID))
-    l1_data <- map_dfr(dir(paste0(data_path,plateID,"/Analysis/",pipeline_name),pattern = paste0(plateID,"_.*_level_1.csv"), full.names = TRUE), read_csv,
-              col_types =cols(.default = "c",
-                              Nuclei_PC_CC_mean_intensity = col_double(),
-                              Nuclei_PC_CC_max_intensity = col_double(),
-                              Nuclei_PC_CC_min_intensity = col_double(),
-                              well = col_character(),
-                              field = col_double(),
-                              slice = col_double(),
-                              time_slice = col_character(),
-                              Cyto_PC_CC_mean_intensity = col_double(),
-                              Cyto_PC_CC_max_intensity = col_double(),
-                              Cyto_PC_CC_min_intensity = col_double(),
-                              Cell_PC_CC_mean_intensity_ratio = col_double(),
-                              Cell_PC_CC_max_intensity_ratio = col_double(),
-                              Cell_PC_CC_min_intensity_ratio = col_double(),
-                              label = col_double(),
-                              begins = col_double(),
-                              ends = col_double(),
-                              parent = col_double(),
-                              length = col_double()
-              )) %>%
-      mutate(plateID = plateID,
+    l1_data <- map_dfr(dir(paste0(data_path,plateID,"/Analysis/",pipeline_name),pattern = paste0(plateID,"_.*_level_1.csv"), full.names = TRUE)[1], read_csv,
+                       col_types =cols(.default = "c",
+                                       label = col_double(),
+                                       Cell_CK_CC_area = col_double(),
+                                       Cell_CK_CC_bbox_area = col_double(),
+                                       Cell_CK_CC_convex_area = col_double(),
+                                       `Cell_CK_CC_centroid-0` = col_double(),
+                                       `Cell_CK_CC_centroid-1` = col_double(),
+                                       Cell_CK_CC_eccentricity = col_double(),
+                                       Cell_CK_CC_equivalent_diameter = col_double(),
+                                       Cell_CK_CC_extent = col_double(),
+                                       Cell_CK_CC_feret_diameter_max = col_double(),
+                                       Cell_CK_CC_filled_area = col_double(),
+                                       Cell_CK_CC_major_axis_length = col_double(),
+                                       Cell_CK_CC_minor_axis_length = col_double(),
+                                       `Cell_CK_CC_moments_hu-0` = col_double(),
+                                       `Cell_CK_CC_moments_hu-1` = col_double(),
+                                       `Cell_CK_CC_moments_hu-2` = col_double(),
+                                       `Cell_CK_CC_moments_hu-3` = col_double(),
+                                       `Cell_CK_CC_moments_hu-4` = col_double(),
+                                       `Cell_CK_CC_moments_hu-5` = col_double(),
+                                       `Cell_CK_CC_moments_hu-6` = col_double(),
+                                       Cell_CK_CC_perimeter = col_double(),
+                                       Cell_CK_CC_perimeter_crofton = col_double(),
+                                       Cell_CK_CC_solidity = col_double(),
+                                       Cell_CK_CC_mean_intensity = col_double(),
+                                       Cell_CK_CC_max_intensity = col_double(),
+                                       Cell_CK_CC_min_intensity = col_double(),
+                                       well = col_character(),
+                                       field = col_double(),
+                                       slice = col_double(),
+                                       time_slice = col_character(),
+                                       nuclei_label = col_double(),
+                                       cyto_label = col_double(),
+                                       Cyto_CK_CC_mean_intensity = col_double(),
+                                       Cyto_CK_CC_max_intensity = col_double(),
+                                       Cyto_CK_CC_min_intensity = col_double(),
+                                       nuc_label = col_double(),
+                                       Nuclei_CK_CC_area = col_double(),
+                                       Nuclei_CK_CC_bbox_area = col_double(),
+                                       Nuclei_CK_CC_convex_area = col_double(),
+                                       `Nuclei_CK_CC_centroid-0` = col_double(),
+                                       `Nuclei_CK_CC_centroid-1` = col_double(),
+                                       Nuclei_CK_CC_eccentricity = col_double(),
+                                       Nuclei_CK_CC_equivalent_diameter = col_double(),
+                                       Nuclei_CK_CC_extent = col_double(),
+                                       Nuclei_CK_CC_feret_diameter_max = col_double(),
+                                       Nuclei_CK_CC_filled_area = col_double(),
+                                       Nuclei_CK_CC_major_axis_length = col_double(),
+                                       Nuclei_CK_CC_minor_axis_length = col_double(),
+                                       `Nuclei_CK_CC_moments_hu-0` = col_double(),
+                                       `Nuclei_CK_CC_moments_hu-1` = col_double(),
+                                       `Nuclei_CK_CC_moments_hu-2` = col_double(),
+                                       `Nuclei_CK_CC_moments_hu-3` = col_double(),
+                                       `Nuclei_CK_CC_moments_hu-4` = col_double(),
+                                       `Nuclei_CK_CC_moments_hu-5` = col_double(),
+                                       `Nuclei_CK_CC_moments_hu-6` = col_double(),
+                                       Nuclei_CK_CC_perimeter = col_double(),
+                                       Nuclei_CK_CC_perimeter_crofton = col_double(),
+                                       Nuclei_CK_CC_solidity = col_double(),
+                                       Nuclei_CK_CC_mean_intensity = col_double(),
+                                       Nuclei_CK_CC_max_intensity = col_double(),
+                                       Nuclei_CK_CC_min_intensity = col_double(),
+                                       nuc_exp_label = col_double(),
+                                       NucExp_CK_CC_mean_intensity = col_double(),
+                                       NucExp_CK_CC_max_intensity = col_double(),
+                                       NucExp_CK_CC_min_intensity = col_double(),
+                                       Cell_CK_CC_mean_intensity_ratio = col_double(),
+                                       Cell_CK_CC_max_intensity_ratio = col_double(),
+                                       Cell_CK_CC_min_intensity_ratio = col_double(),
+                                       begins = col_double(),
+                                       ends = col_double(),
+                                       parent = col_double(),
+                                       length = col_double(),
+                                       is_parent = col_logical(),
+                                       plateID = col_character(),
+                                       Well = col_character(),
+                                       Cellline = col_character(),
+                                       Ligand1 = col_character(),
+                                       Ligand1Concentration = col_double(),
+                                       Ligand1ConcentrationUnits = col_character(),
+                                       Ligand2 = col_character(),
+                                       Ligand2Concentration = col_double(),
+                                       Ligand2ConcentrationUnits = col_character(),
+                                       Ligand3 = col_character(),
+                                       Ligand3Concentration = col_double(),
+                                       Ligand3ConcentrationUnits = col_character(),
+                                       ECMP1 = col_character(),
+                                       ECMP1Concentration = col_double(),
+                                       ECMP1ConcentrationUnits = col_character(),
+                                       Drug1 = col_character(),
+                                       Drug1Concentration = col_double(),
+                                       Drug1ConcentrationUnits = col_character(),
+                                       Drug2 = col_character(),
+                                       Drug2Concentration = col_character(),
+                                       Drug2ConcentrationUnits = col_character(),
+                                       `incubation _media` = col_character(),
+                                       Endpoint_red = col_character(),
+                                       Endpoint_green = col_character(),
+                                       row = col_character(),
+                                       column = col_double()
+                       )) %>%
+      janitor::clean_names(case = "none") 
+    %>%
+      mutate(plateId = plateID,
              day = str_remove(time_slice, "d.*"),
              day = as.integer(day),
              hour = str_extract(time_slice, "[0-9]*h"),
@@ -176,30 +260,30 @@ create_level_2_data <- function(plateID, data_path = "/home/exacloud/gscratch/He
              elapsed_minutes = day*24*60+hour*60+minute,
              elapsed_minutes = case_when(elapsed_minutes%%30 == 0 ~elapsed_minutes,
                                          elapsed_minutes%%30 == 3 ~elapsed_minutes-3),
-             ligand = paste(Ligand1, Ligand2, Ligand3, sep = "_"),
+             ligand = paste(ligand1, ligand2, ligand3, sep = "_"),
              ligand = str_remove_all(ligand, "_none"),
-             drugs =  paste(Drug1 ,Drug2, sep = "_"),
+             drugs =  paste(drug1 ,drug2, sep = "_"),
              drugs = str_remove_all(drugs, "_none|_0"),
-             treatment =  paste(Drug1, Drug1Concentration,Drug2, Drug2Concentration, sep = "_"),
+             treatment =  paste(drug1, drug1Concentration,drug2, drug2Concentration, sep = "_"),
              treatment = str_remove_all(treatment, "_none|_0"),
-            # treatment = factor(treatment, levels = treatment_levels, ordered = TRUE),
+            # treatment = factor(treatment, levels = treatment_levels, ordered = TRUe),
              cell_cycle_state = case_when(Cell_PC_CC_mean_intensity_ratio <= g1_threshold ~"G1",
                                           Cell_PC_CC_mean_intensity_ratio > g1_threshold ~"S/G2")) %>%
       filter(!elapsed_minutes %in% c()) 
     
      #add in lineage tracks data
-  tracks_df <- map_dfr(dir(paste0(data_path, plateID), pattern = "tracks.csv", recursive = TRUE, full.names = TRUE),
+  tracks_df <- map_dfr(dir(paste0(data_path, plateId), pattern = "tracks.csv", recursive = TRUe, full.names = TRUe),
 process_tracks_file)
   l1 <- l1_data %>%
-    left_join(tracks_df, by = c("plateID", "well", "field", "label"))
+    left_join(tracks_df, by = c("plateId", "well", "field", "label"))
     
     write_csv(l1,l1_data_path)
     
     l1 <- read_process_l1_data(l1_data_path)
     
     l2 <- l1 %>%
-      group_by(plateID, well, field, elapsed_minutes, treatment, drugs, Drug1,
-               Drug1Concentration, Drug2, Drug2Concentration) %>%
+      group_by(plateId, well, field, elapsed_minutes, treatment, drugs, drug1,
+               drug1Concentration, drug2, drug2Concentration) %>%
       summarise(n = n(),
                 Nuclei_PC_CC_mean_intensity=mean(Nuclei_PC_CC_mean_intensity),
                 Cyto_PC_CC_mean_intensity=mean(Cyto_PC_CC_mean_intensity),
@@ -216,8 +300,8 @@ process_tracks_file)
     l2 <- l2 %>%
       filter(elapsed_minutes == earliest_time_point) %>%
       rename(n_0 = n) %>%
-      select("plateID","well", "field", "n_0") %>%
-      right_join(l2,by = c("plateID", "well", "field")) %>%
+      select("plateId","well", "field", "n_0") %>%
+      right_join(l2,by = c("plateId", "well", "field")) %>%
       mutate(cell_count_norm_T0 = n/n_0)
     
       write_csv(l2,l2_data_path)
@@ -237,7 +321,7 @@ process_tracks_file)
 
 
 
-generate_plots <- function(plateID, l1, l2){
+generate_plots <- function(plateId, l1, l2){
  
 # treatment_levels = c("vehicle",
 #                      "control",
@@ -257,31 +341,31 @@ generate_plots <- function(plateID, l1, l2){
 #                      "Paclitaxel_2_Doxorubicin_20",
 #                      "Paclitaxel_2_Palbociclib_50",
 #                      "Paclitaxel_2_Gemcitabine_10",
-#                      "BEZ235_1", "BEZ235_2.5", "BEZ235_5", "BEZ235_10", "BEZ235_20", "BEZ235_30", "BEZ235_50",
+#                      "BeZ235_1", "BeZ235_2.5", "BeZ235_5", "BeZ235_10", "BeZ235_20", "BeZ235_30", "BeZ235_50",
 #                      "Cabozantinib_50", "Cabozantinib_100",  "Cabozantinib_250", "Cabozantinib_500", "Cabozantinib_1000", "Cabozantinib_2500", "Cabozantinib_5000",
 #                      "Trametinib_50", "Trametinib_100", "Trametinib_250", "Trametinib_500", "Trametinib_1000", 
 #                      "Trametinib_2500", "Trametinib_5000",
 #                      "5FU_125", "5FU_250", "5FU_400", "5FU_550", "5FU_750", "5FU_1000", "5FU_2500", 
-#                      "AZD5438_50", "AZD5438_100", "AZD5438_250","AZD5438_500", "AZD5438_1000", "AZD5438_2500", "AZD5438_5000",
+#                      "AZd5438_50", "AZd5438_100", "AZd5438_250","AZd5438_500", "AZd5438_1000", "AZd5438_2500", "AZd5438_5000",
 #                      "Panobinostat.5", "Panobinostat_1", "Panobinostat_2.5", "Panobinostat_5" , "Panobinostat_6.5" ,  "Panobinostat_10", "Panobinostat_12.5",
 #                      "JQ1_50",  "JQ1_100", "JQ1_250", "JQ1_500", "JQ1_1000", "JQ1_2500", "JQ1_5000",
 #                      "Bortezomib_1",  "Bortezomib_2.5", "Bortezomib_5", "Bortezomib_10", "Bortezomib_20", "Bortezomib_30", "Bortezomib_50", 
 #                      "MK1775_50", "MK1775_100", "MK1775_175","MK1775_275", "MK1775_375", "MK1775_500", "MK1775_700",
 #                      "MG132_1", "MG132_2.5","MG132_5","MG132_10","MG132_20","MG132_30","MG132_50",
-#                      "Everolimus_50","Everolimus_100","Everolimus_250","Everolimus_500","Everolimus_1000","Everolimus_2500","Everolimus_5000")
+#                      "everolimus_50","everolimus_100","everolimus_250","everolimus_500","everolimus_1000","everolimus_2500","everolimus_5000")
 
-cols <- c("BEZ235_1" = "cornflowerblue", "Cabozantinib_50" = "cornflowerblue", "Trametinib_50" = "cornflowerblue",
-          "BEZ235_2.5" = "darkcyan", "Cabozantinib_100" = "darkcyan","Trametinib_100" = "darkcyan",
-          "BEZ235_5" = "cadetblue4",   "Cabozantinib_250" = "cadetblue4", "Trametinib_250" = "cadetblue4",
-          "BEZ235_10" = "cadetblue", "Cabozantinib_500" = "cadetblue",  "Trametinib_500" = "cadetblue", 
-          "BEZ235_20" = "blue",  "Cabozantinib_1000" = "blue", "Trametinib_1000" = "blue",
-          "BEZ235_30" = "blue3",  "Cabozantinib_2500" = "blue3", "Trametinib_2500" = "blue3",
-          "BEZ235_50" = "darkblue", "Cabozantinib_5000" = "darkblue", "Trametinib_5000" = "darkblue",
+cols <- c("BeZ235_1" = "cornflowerblue", "Cabozantinib_50" = "cornflowerblue", "Trametinib_50" = "cornflowerblue",
+          "BeZ235_2.5" = "darkcyan", "Cabozantinib_100" = "darkcyan","Trametinib_100" = "darkcyan",
+          "BeZ235_5" = "cadetblue4",   "Cabozantinib_250" = "cadetblue4", "Trametinib_250" = "cadetblue4",
+          "BeZ235_10" = "cadetblue", "Cabozantinib_500" = "cadetblue",  "Trametinib_500" = "cadetblue", 
+          "BeZ235_20" = "blue",  "Cabozantinib_1000" = "blue", "Trametinib_1000" = "blue",
+          "BeZ235_30" = "blue3",  "Cabozantinib_2500" = "blue3", "Trametinib_2500" = "blue3",
+          "BeZ235_50" = "darkblue", "Cabozantinib_5000" = "darkblue", "Trametinib_5000" = "darkblue",
           "5FU_125" = "cornflowerblue", "5FU_250"= "darkcyan", "5FU_400" = "cadetblue4", "5FU_550" = "cadetblue",
           "5FU_750" = "blue", "5FU_1000" = "blue3", "5FU_2500" = "darkblue", 
-          "AZD5438_50"= "cornflowerblue", "AZD5438_100"= "darkcyan", "AZD5438_250" = "cadetblue4",
-          "AZD5438_500" = "cadetblue", "AZD5438_1000" = "blue", "AZD5438_2500" = "blue3",
-          "AZD5438_5000" = "darkblue",
+          "AZd5438_50"= "cornflowerblue", "AZd5438_100"= "darkcyan", "AZd5438_250" = "cadetblue4",
+          "AZd5438_500" = "cadetblue", "AZd5438_1000" = "blue", "AZd5438_2500" = "blue3",
+          "AZd5438_5000" = "darkblue",
           "Bortezomib_1" = "cornflowerblue", "Bortezomib_2.5"= "darkcyan", "Bortezomib_5" = "cadetblue4",
           "Bortezomib_10" = "cadetblue","Bortezomib_20" = "blue", "Bortezomib_30" = "blue3","Bortezomib_50" = "darkblue",
           "Panobinostat.5"= "cornflowerblue", "Panobinostat_1"= "darkcyan", "Panobinostat_2.5" = "cadetblue4",
@@ -293,9 +377,9 @@ cols <- c("BEZ235_1" = "cornflowerblue", "Cabozantinib_50" = "cornflowerblue", "
           "MK1775_375" = "blue", "MK1775_500" = "blue3", "MK1775_700" = "darkblue",
           "MG132_1" = "cornflowerblue", "MG132_2.5" = "darkcyan", "MG132_5" = "cadetblue4","MG132_10" = "cadetblue",
           "MG132_20" = "blue", "MG132_30" = "blue3", "MG132_50" = "darkblue",
-          "Everolimus_50" = "cornflowerblue", "Everolimus_100"= "darkcyan", "Everolimus_250" = "cadetblue4",
-          "Everolimus_500" = "cadetblue", "Everolimus_1000" = "blue", "Everolimus_2500" = "blue3",
-          "Everolimus_5000" = "darkblue")
+          "everolimus_50" = "cornflowerblue", "everolimus_100"= "darkcyan", "everolimus_250" = "cadetblue4",
+          "everolimus_500" = "cadetblue", "everolimus_1000" = "blue", "everolimus_2500" = "blue3",
+          "everolimus_5000" = "darkblue")
 
 
   g1_threshold <- .96
@@ -368,14 +452,14 @@ cols <- c("BEZ235_1" = "cornflowerblue", "Cabozantinib_50" = "cornflowerblue", "
   #   l2_mean <- l2 %>%
   #   filter(!treatment %in% c("vehicle", "control")) %>%
   #   mutate(treatment = fct_drop(treatment)) %>%
-  #   group_by(elapsed_minutes, treatment, drugs, Drug1Concentration) %>%
+  #   group_by(elapsed_minutes, treatment, drugs, drug1Concentration) %>%
   #   summarise(cell_count_norm_T0 = mean(cell_count_norm_T0),
   #             n = mean(n),
   #             G1_proportion = mean(G1_proportion)) %>%
   #     left_join(l2_control_mean, by = "elapsed_minutes")
   #   
   # 
-  # p_n_t_T0_mean <- ggplot(l2_mean, aes(x = elapsed_minutes, y = cell_count_norm_T0, color = treatment, group = Drug1Concentration)) +
+  # p_n_t_T0_mean <- ggplot(l2_mean, aes(x = elapsed_minutes, y = cell_count_norm_T0, color = treatment, group = drug1Concentration)) +
   #   geom_path() +
   #   geom_path(aes(y = cell_count_norm_T0_control), color = "red")+
   #   scale_y_continuous(trans = 'log2') +
@@ -390,7 +474,7 @@ cols <- c("BEZ235_1" = "cornflowerblue", "Cabozantinib_50" = "cornflowerblue", "
   #   theme_bw()
   # p_n_t_T0_mean
   # 
-  # p_G1_t_mean <- ggplot(l2_mean, aes(x = elapsed_minutes, y = G1_proportion, color = treatment, group = Drug1Concentration)) +
+  # p_G1_t_mean <- ggplot(l2_mean, aes(x = elapsed_minutes, y = G1_proportion, color = treatment, group = drug1Concentration)) +
   #   geom_path() +
   #   scale_color_manual(values = cols) +
   #   labs(title = "G1 proportion for each treatment",
@@ -495,7 +579,7 @@ cols <- c("BEZ235_1" = "cornflowerblue", "Cabozantinib_50" = "cornflowerblue", "
   #   theme_bw()
   # p
   
-  pdf(paste0("../plots/",plateID,"_QA.pdf"), width = 10, height = 14)
+  pdf(paste0("../plots/",plateId,"_QA.pdf"), width = 10, height = 14)
   # print(p_n_t_T0_mean)
   # print(p_G1_t_mean)
   print(p_densities)
@@ -509,8 +593,8 @@ cols <- c("BEZ235_1" = "cornflowerblue", "Cabozantinib_50" = "cornflowerblue", "
   
 }
 
-compare_to_CP <- function(plateID, l2){
-  plate_CP_data <- map_dfr(dir(path = "../CP_data", pattern = paste0(plateID,".csv"),full.names = TRUE), read_csv) %>%
+compare_to_CP <- function(plateId, l2){
+  plate_CP_data <- map_dfr(dir(path = "../CP_data", pattern = paste0(plateId,".csv"),full.names = TRUe), read_csv) %>%
     mutate(well_column = str_remove(Metadata_Well, "[A-Z]") %>%
              sprintf("%02s", .),
            well_row = str_remove(Metadata_Well, "[[:digit:]*]"),
@@ -548,7 +632,7 @@ compare_to_CP <- function(plateID, l2){
     facet_grid(well~field)
   p_PIvsCP
   
-  pdf(paste0("../plots/",plateID,"_cell_count_pipeline_comparison.pdf"), height = 24)
+  pdf(paste0("../plots/",plateId,"_cell_count_pipeline_comparison.pdf"), height = 24)
   print(p_PC_CP)
   print(p_PIvsCP)
   res <- dev.off()
@@ -562,24 +646,24 @@ compare_to_CP <- function(plateID, l2){
 
 ```{r visualize_data}
 
-process_plate<- function(plateID, ...){
-  datasets <- create_level_2_data(plateID, data_path = data_path)
-  generate_plots(plateID, datasets$l1, datasets$l2)
-  generate_lineage_plots(plateID, datasets$l1, datasets$l2)
- #compare_to_CP(plateID, l2)
+process_plate<- function(plateId, ...){
+  datasets <- create_level_2_data(plateId, data_path = data_path)
+  generate_plots(plateId, datasets$l1, datasets$l2)
+  generate_lineage_plots(plateId, datasets$l1, datasets$l2)
+ #compare_to_CP(plateId, l2)
 }
 
-data_path <- "/home/exacloud/gscratch/HeiserLab/images/"
-#data_path <- "/Users/dane/Documents/CellTrackingProjects/AU565/images/"
+data_path <- "/home/exacloud/gscratch/Heiserlab/images/"
+#data_path <- "/Users/dane/documents/CellTrackingProjects/AU565/images/"
 pipeline_name <- "CK"
-plateID <- "AU02001"
+plateId <- "AU02001"
    
 #res <- map(c("AU02001"), process_plate, data_path = data_path)
 
 
-datasets <- create_level_2_data(plateID, data_path = data_path)
-generate_plots(plateID, datasets$l1, datasets$l2)
-generate_lineage_plots(plateID, datasets$l1, datasets$l2)
+datasets <- create_level_2_data(plateId, data_path = data_path)
+generate_plots(plateId, datasets$l1, datasets$l2)
+generate_lineage_plots(plateId, datasets$l1, datasets$l2)
 #res <- map(c("AU01901","AU02001","AU02002", "AU02101"), process_plate)
 #res <- map(c("AU01501","AU01601","AU01701","AU01702","AU01801","AU01802","AU01901","AU01902","AU02001","AU02002","AU02101","AU02301","AU02401", "AU02501"), process_plate)
 
@@ -587,12 +671,12 @@ generate_lineage_plots(plateID, datasets$l1, datasets$l2)
 
 ```{r lineage_plot, fig.height=12}
 
-generate_lineage_plots <- function(plateID, l1, l2){
+generate_lineage_plots <- function(plateId, l1, l2){
   #Use the l1 data to create lineage plots of each movie
 
 
 # df_t0_cells <- l1 %>%
-#   select(plateID, well, field, slice, time_slice, elapsed_minutes, day,hour, minute, treatment, label, begins, ends, parent, length, lineage, Drug1, Drug1Concentration, Cell_PC_CC_mean_intensity_ratio,cell_cycle_state) %>%
+#   select(plateId, well, field, slice, time_slice, elapsed_minutes, day,hour, minute, treatment, label, begins, ends, parent, length, lineage, drug1, drug1Concentration, Cell_PC_CC_mean_intensity_ratio,cell_cycle_state) %>%
 #   filter(field ==1,
 #          label %in% t0_lineages) %>%
 #   arrange(length) %>%
@@ -633,22 +717,22 @@ generate_lineage_plots <- function(plateID, l1, l2){
 
 # p_lineages_paths <- ggplot(df_lineage_labels, aes(x = elapsed_minutes, y = lineage_label, group = label, color = lineage)) +
 #   geom_path() +
-#   scale_color_manual(values=rep(brewer.pal(8,"Dark2"),times=10)) +
+#   scale_color_manual(values=rep(brewer.pal(8,"dark2"),times=10)) +
 #   guides(color = "none") +
 #   theme_classic() +
 #   theme(axis.text.y = element_blank())
 # p_lineages_paths
-create_lineage_pdf <- function(df, pID, wll, fld){
-  df_plateID_well_field <- df %>%
-    filter(plateID == pID,
+create_lineage_pdf <- function(df, pId, wll, fld){
+  df_plateId_well_field <- df %>%
+    filter(plateId == pId,
            well ==  wll,
            field == fld)
   
-  t0_lineages <- df_plateID_well_field %>%
+  t0_lineages <- df_plateId_well_field %>%
   filter(slice == 0) %>%
   pull(lineage)
   #make a complete lineage tree diagram
-df_lineage_labels <- df_plateID_well_field %>%
+df_lineage_labels <- df_plateId_well_field %>%
  # filter(lineage %in%t0_lineages) %>%
   arrange(lineage) %>%
   mutate(lineage = factor(lineage),
@@ -658,10 +742,10 @@ df_lineage_labels <- df_plateID_well_field %>%
   #geom_path() +
   geom_point(size = 1, shape = 21, stroke = .1)+
  # geom_vline(xintercept = 2460, color = "lightgray") +
-  scale_fill_manual(values=rep(brewer.pal(8,"Dark2"),times=200)) +
+  scale_fill_manual(values=rep(brewer.pal(8,"dark2"),times=200)) +
   scale_color_manual(values = c("G1" = "transparent", "S/G2" = "black"))+
   guides(color = "none", fill = "none") +
-  labs(title = paste("T0 lineages -",unique(df_lineage_labels$Drug1),"field",unique(df_lineage_labels$field)),
+  labs(title = paste("T0 lineages -",unique(df_lineage_labels$drug1),"field",unique(df_lineage_labels$field)),
        subtitle = "S/G2 shown with black outline") +
   ylab("Cells colored by lineage") +
   theme_classic() +
@@ -670,18 +754,18 @@ df_lineage_labels <- df_plateID_well_field %>%
         axis.ticks.y = element_blank()) 
 p_lineages_state
 
-pdf(paste0("../plots/",plateID,"_",wll,"_", fld,"_lineage_plot.pdf"), height = 30)
+pdf(paste0("../plots/",plateId,"_",wll,"_", fld,"_lineage_plot.pdf"), height = 30)
 #print(p_gen_0_cells)
 #print(p_lineages_paths)
 print(p_lineages_state)
 res <- dev.off()
 }
-res <- create_lineage_pdf(l1, plateID, "A1", 1)
-res <- create_lineage_pdf(l1, plateID, "A1", 2)
-res <- create_lineage_pdf(l1, plateID, "C1", 1)
-res <- create_lineage_pdf(l1, plateID, "C1", 2)
-res <- create_lineage_pdf(l1, plateID, "C2", 1)
-res <- create_lineage_pdf(l1, plateID, "C2", 2)
+res <- create_lineage_pdf(l1, plateId, "A1", 1)
+res <- create_lineage_pdf(l1, plateId, "A1", 2)
+res <- create_lineage_pdf(l1, plateId, "C1", 1)
+res <- create_lineage_pdf(l1, plateId, "C1", 2)
+res <- create_lineage_pdf(l1, plateId, "C2", 1)
+res <- create_lineage_pdf(l1, plateId, "C2", 2)
 }
 
 ```
