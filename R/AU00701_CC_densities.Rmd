@@ -1,0 +1,148 @@
+---
+title: "AU565 cell cycle distributions"
+output: 
+  html_document:
+  code_folding: hide
+---
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = FALSE)
+
+library(tidyverse)
+library(RColorBrewer)
+library(readxl)
+library(umap)
+library(ComplexHeatmap)
+library(circlize)
+
+```
+
+
+```{r get_data, cache=FALSE}
+plateID <- "AU00701"
+data_path <- "../../../../images/"
+  raw_data <- dir(paste0(data_path,plateID,"/Analysis/PI/"), pattern = paste0(plateID,"_[A-D][0-9]_"), full.names = TRUE)[c(1,7)] %>%
+  map(read_csv, progress = FALSE
+  
+  ,
+      col_types = cols(
+  X1 = col_double(),
+  label = col_double(),
+  Nuclei_CL_NR_area = col_double(),
+  Nuclei_CL_NR_eccentricity = col_double(),
+  Nuclei_CL_NR_mean_intensity = col_double(),
+  Nuclei_CL_NR_max_intensity = col_double(),
+  Nuclei_CL_NR_min_intensity = col_double(),
+  Nuclei_CL_NR_feret_diameter_max = col_double(),
+  Nuclei_CL_NR_solidity = col_double(),
+  well = col_character(),
+  field = col_double(),
+  time = col_character(),
+  label_1 = col_double(),
+  Nuclei_CL_CC_mean_intensity = col_double(),
+  Nuclei_CL_CC_max_intensity = col_double(),
+  Nuclei_CL_CC_min_intensity = col_double()
+)) %>%
+  bind_rows() %>%
+  mutate(well_col = str_remove(well, "[A-Z]"),
+         well_col = as.integer(well_col),
+         well = sprintf("%.1s%02.2d", well, well_col),
+         day = str_remove(time_slice, "d.*"),
+         day = as.integer(day),
+         hour = str_extract(time_slice, "[0-9]*h"),
+         hour = str_remove(hour, "h"),
+         hour = as.integer(hour),
+         minute = str_extract(time_slice, "[0-9]*m"),
+         minute = str_remove(minute, "m"),
+         minute = as.integer(minute),
+         elapsed_minutes = day*24*60+hour*60+minute) %>%
+  filter(!elapsed_minutes %in% c()) %>%
+  drop_na()
+  
+  treatment_levels = c("vehicle", 
+                      "5FU_125", "5FU_250", "5FU_400", "5FU_550", "5FU_750", "5FU_1000", "5FU_2500",
+                      "AZD5438_50", "AZD5438_100", "AZD5438_250", "AZD5438_500", "AZD5438_1000", "AZD5438_2500", "AZD5438_5000",
+                      "Panobinostat.5","Panobinostat_1", "Panobinostat_2.5", "Panobinostat_5", "Panobinostat_6.5",  "Panobinostat_10", "Panobinostat_12.5")
+
+
+  metadata <- dir(path = paste0(data_path,plateID,"/metadata/"), pattern = paste0(plateID,".xlsx"), full.names = TRUE)  %>%
+  map(readxl::read_excel) %>%
+  bind_rows() %>%
+  mutate(ligand = paste(Ligand1, Ligand2, Ligand3, sep = "_"),
+         ligand = str_remove_all(ligand, "_none"),
+         drugs =  paste(Drug1 ,Drug2, sep = "_"),
+         drugs = str_remove_all(drugs, "_none|_0"),
+         treatment =  paste(Drug1, Drug1Concentration,Drug2, Drug2Concentration, sep = "_"),
+         treatment = str_remove_all(treatment, "_none|_0"),
+         treatment = factor(treatment, levels = treatment_levels,ordered = TRUE)) %>%
+  distinct()
+
+data_ann <- raw_data %>%
+  left_join(metadata, by = c("well" = "Well")) 
+
+
+```
+
+```{r reporter_densities, fig.height=7}
+
+df <- data_ann %>%
+  mutate(Nuclei_PI_CC_total_intensity = Nuclei_PI_CC_area*Nuclei_PI_CC_mean_intensity) %>%
+  filter(well == "A03",
+         field == 1,
+         elapsed_minutes >= 5700) 
+
+p_A3_density <- ggplot(df, aes(x = Cell_PI_CC_mean_intensity_ratio)) +
+  geom_density() +
+  labs(title = paste0(plateID, "_",unique(df$well), "_",unique(df$field))) +
+  theme_bw() +
+  theme(strip.text = element_text(size = 4)) +
+  facet_wrap(~elapsed_minutes)
+#p_A3_density
+
+p_A3_hist <- ggplot(df, aes(x = Cell_PI_CC_mean_intensity_ratio)) +
+  geom_histogram(bins = 40) +
+  labs(title = paste0(plateID, "_",unique(df$well), "_",unique(df$field))) +
+  theme_bw() +
+  theme(strip.text = element_text(size = 4)) 
+p_A3_hist
+
+G1_thresh <- 0.96
+df <- data_ann %>%
+  mutate(Nuclei_PI_CC_total_intensity = Nuclei_PI_CC_area*Nuclei_PI_CC_mean_intensity,
+         G1 = Cell_PI_CC_mean_intensity_ratio < G1_thresh) %>%
+  filter(well == "B05",
+         field == 1,
+         elapsed_minutes >= 5700) 
+B5_G1_prop <-  signif(sum(df$G1)/nrow(df), 2)
+ 
+
+p_B5_density <- ggplot(df, aes(x = Cell_PI_CC_mean_intensity_ratio)) +
+  geom_density() +
+    labs(title = paste0(plateID, "_",unique(df$well), "_",unique(df$field))) +
+  theme_bw() +
+  theme(strip.text = element_text(size = 4)) +
+  facet_wrap(~elapsed_minutes)
+#p_B5_density
+
+p_B5_hist <- ggplot(df, aes(x = Cell_PI_CC_mean_intensity_ratio)) +
+  geom_histogram(bins = 40) +
+  geom_vline(xintercept = G1_thresh, color = "blue") +
+  annotate("text",x = .85, y = 70, label = paste("G1 proportion:",B5_G1_prop), size = 4, color = "blue") +
+  annotate("text",x = 1.08, y = 70, label = paste("S/G2 proportion:",1-B5_G1_prop), size = 4, color = "blue") +
+  labs(title = "10 uM lapatinib ",
+       subtitle = paste0(plateID, "_",unique(df$well), "_",unique(df$field)),
+       x = "Cell cycle reporter ratio",
+       y = "count") +
+  theme_bw() +
+  theme(strip.text = element_text(size = 4)) 
+p_B5_hist
+
+pdf("../plots/AU565_cell_cycle_reporter_distributions.pdf")
+#print(p_A3_density)
+#print(p_A3_hist)
+#print(p_B5_density)
+print(p_B5_hist)
+res <- dev.off()
+
+```

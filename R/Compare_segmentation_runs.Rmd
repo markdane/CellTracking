@@ -1,0 +1,146 @@
+---
+title: "Compare segmentation runs"
+output:
+  html_document: null
+  pdf_document: default
+  code_folding: hide
+---
+
+```{r setup, include=FALSE, cache=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+
+library(tidyverse)
+library(broom)
+library(RColorBrewer)
+
+```
+
+```{r functions}
+get_data <- function(plateID, data_path, pipeline_name = "PC2", data_level = "1"){
+  data_paths <- dir(paste0(data_path, plateID, "/Analysis/",pipeline_name), pattern = paste0(".*_level_",data_level,".csv"), full.names = TRUE)
+  if(length(data_paths)==0) stop(paste0("no files found at ",data_path, plateID, "/Analysis/",pipeline_name,"/"))
+  if(str_detect(pipeline_name, "PC")){
+    reporter = "NR"
+  } else {
+    reporter = "CC"
+  }
+  df <- map(data_paths, read.csv) %>%
+    bind_rows() %>%
+    select(label, well, field, time_slice, paste0("Nuclei_",pipeline_name,"_",reporter,"_area")) %>%
+    rename(Nuclei_area = paste0("Nuclei_",pipeline_name,"_",reporter,"_area")) %>%
+    drop_na()
+  return(df)
+}
+
+```
+
+
+```{r get_data}
+
+data_path <- "/home/exacloud/gscratch/HeiserLab/images/"
+plateID <- c("AU02001")
+area_threshold_min <- 30
+area_threshold_max <- 450
+
+
+new_data <- get_data(plateID = "AU02001", data_path=data_path, pipeline_name = "PC2", data_level = "1") %>%
+  filter(Nuclei_area > area_threshold_min,
+         Nuclei_area < area_threshold_max) %>%
+  count(well, field, time_slice, name = "cell_count_new") %>%
+  arrange(time_slice) 
+
+baseline_data <- get_data(plateID = "AU02001", data_path=data_path, pipeline_name = "PC", data_level = "1") %>%
+  filter(Nuclei_area > area_threshold_min,
+         Nuclei_area < area_threshold_max) %>%
+  count(well, field, time_slice, name = "cell_count_baseline") %>%
+  arrange(time_slice) 
+
+# ilastik_data <- get_data(plateID = "AU02001", data_path=data_path, pipeline_name = "P", data_level = "1") %>%
+#   filter(Nuclei_area > area_threshold_min,
+#          Nuclei_area < area_threshold_max) %>%
+#   count(well, field, time_slice, name = "cell_count_ilastik") %>%
+#   arrange(time_slice)
+
+cell_count_df <- inner_join(new_data, baseline_data, by = c("well", "field", "time_slice")) %>%
+  arrange(well, field, time_slice) %>%
+  mutate(cell_count_new_log2 = log2(cell_count_new),
+         cell_count_baseline_log2 = log2(cell_count_baseline),
+         day = str_remove(time_slice, "d.*"),
+         day = as.integer(day),
+         hour = str_extract(time_slice, "[0-9]*h"),
+         hour = str_remove(hour, "h"),
+         hour = as.integer(hour),
+         minute = str_extract(time_slice, "[0-9]*m"),
+         minute = str_remove(minute, "m"),
+         minute = as.integer(minute),
+         elapsed_minutes = day*24*60+hour*60+minute,
+         elapsed_minutes = case_when(elapsed_minutes%%30 == 0 ~elapsed_minutes,
+                                     elapsed_minutes%%30 == 3 ~elapsed_minutes-3))
+
+```
+
+```{r compare_cell_counts}
+
+evaluate_cell_counts <- function(wells, segmentation_name, df = cell_count_df){
+  
+
+#f <- as.formula(paste0("~ mgcv::gam","(cell_count_",segmentation_name,"_log2 ~ s(elapsed_minutes, bs = 'cs'), data = .)"))
+f <- as.formula(paste0("~ lm","(cell_count_",segmentation_name,"_log2 ~ elapsed_minutes + I(elapsed_minutes^2) + I(elapsed_minutes^3) + I(elapsed_minutes^4), data = .)"))
+#f <- as.formula(paste0("~ lm","(cell_count_",segmentation_name,"_log2 ~ elapsed_minutes , data = .)"))
+f_plot <- as.formula(paste0("y ~ x + I(x^2) + I(x^3)"))
+
+  p <- ggplot(filter(df, well == wells), aes_string(x = "elapsed_minutes", y = paste0("cell_count_",segmentation_name,"_log2"))) +
+  geom_point(size = .5) +
+stat_smooth(method="lm", se=TRUE, fill=NA,
+                formula=y ~ poly(x, 4, raw=TRUE),colour="blue") +
+    facet_wrap(~field)+
+    labs(title = paste(segmentation_name, wells)) +
+  theme(strip.text = element_text(size = 5)) +
+  theme_bw()
+print(p)
+
+df %>%
+  filter(well == wells) %>% 
+  nest(data = c(time_slice, cell_count_baseline, day, hour, minute, elapsed_minutes, 
+                cell_count_new, cell_count_baseline_log2, cell_count_new_log2)) %>%
+  mutate(fit = map(data, f),
+         results = map(fit, glance)) %>% 
+  unnest(results) %>%
+  select(well, field, r.squared) %>%
+  distinct()
+}
+
+evaluate_cell_counts("D2","new")
+evaluate_cell_counts("D2","baseline")
+
+####ToDo select a model that can fit the drug responses in well D2
+
+# wells <- "A1"
+# p <- ggplot(cell_count_df %>%filter(well == wells), aes(x = cell_count_cellpose, y = cell_count_ilastik)) +
+#   geom_point(size = .5) +  
+#   facet_wrap(~field)+
+#   labs(title =wells) +
+#   theme(strip.text = element_text(size = 5)) +
+#   theme_bw()
+# p
+# 
+# wells <- "D1"
+# p <- ggplot(cell_count_df %>%filter(well == wells), aes(x = cell_count_cellpose, y = cell_count_ilastik)) +
+#   geom_point(size = .5) +  
+#   facet_wrap(~field)+
+#   labs(title =wells) +
+#   theme(strip.text = element_text(size = 5)) +
+#   theme_bw()
+# p
+
+wells <- "D2"
+p <- ggplot(cell_count_df %>%filter(well == wells), aes(x = cell_count_new, y = cell_count_baseline)) +
+  geom_point(size = .5) +  
+  facet_wrap(~field)+
+  labs(title =wells) +
+  theme(strip.text = element_text(size = 5)) +
+  theme_bw()
+p
+
+```
+

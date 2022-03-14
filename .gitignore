@@ -44,4 +44,10 @@ rsconnect/
 *.h5
 *.csv
 *.txt
+*.out
+*out-checkpoint
+*.ipynb_checkpoints*
+plots/*
+CP_data/*
+
 
