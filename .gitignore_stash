@@ -44,7 +44,16 @@ rsconnect/
 *.h5
 *.csv
 *.txt
+<<<<<<< HEAD:.gitignore_stash
 *.pdf
 *.zip
 .ipynb_checkpoints/*-checkpoint.*
+=======
+*.out
+*out-checkpoint
+*.ipynb_checkpoints*
+plots/*
+CP_data/*
+
+>>>>>>> 6195f4ccffba360cea9f0dc14adb77ff081fb5fa:.gitignore
 

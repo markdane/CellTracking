@@ -559,8 +559,6 @@ compare_to_CP <- function(plateID, l2){
 ```
 
 
-<<<<<<< HEAD:R/data_preview_stash.Rmd
-=======
 
 ```{r visualize_data}
 
@@ -590,7 +588,6 @@ res <- map(c("AU02001"), process_plate, data_path = data_path)
 
 ```
 
->>>>>>> 6195f4ccffba360cea9f0dc14adb77ff081fb5fa:R/data_preview.Rmd
 ```{r lineage_plot, fig.height=12}
 
 generate_lineage_plots <- function(plateID, l1, l2){
@@ -626,15 +623,14 @@ generate_lineage_plots <- function(plateID, l1, l2){
 #          lineage = fct_inorder(lineage),
 #          lineage_label = paste0(lineage,"_",label))
 # 
-track_lengths<- l1 %>%
-  group_by(well, field, label) %>%
-  summarise(track_length = unique(length))
+# track_lengths<- l1 %>%
+#   group_by(well, field, label) %>%
+#   summarise(track_length = unique(length))
+# 
+# mean_track_length <- track_lengths %>%
+#   group_by(well, field) %>%
+#   summarise(mean_track_length = mean(track_length))
 
-mean_track_length <- track_lengths %>%
-  group_by(well, field) %>%
-  summarise(mean_track_length = mean(track_length))
-
-print(paste("average track lengths are: ", mean_track_length))
 # %>%
 #   filter(!(begins <3 & length < 6))
 
@@ -690,32 +686,5 @@ res <- create_lineage_pdf(l1, plateID, "C1", 2)
 res <- create_lineage_pdf(l1, plateID, "C2", 1)
 res <- create_lineage_pdf(l1, plateID, "C2", 2)
 }
-
-```
-
-
-```{r visualize_data}
-
-process_plate<- function(plateID, ...){
-  datasets <- create_level_2_data(plateID, data_path = data_path)
-  #datasets <- create_level_2_data(plateID, data_path = data_path)
-
-  #process track files
-  generate_plots(plateID, datasets$l1, datasets$l2)
-  generate_lineage_plots(plateID, datasets$l1, datasets$l2)
- #compare_to_CP(plateID, l2)
-}
-
-data_path <- "/home/exacloud/gscratch/HeiserLab/images/"
-data_path <- "/Users/dane/Documents/CellTrackingProjects/AU565/images/"
-pipeline_name <- "PC"
-plateID <- "AU02001"
-   
-res <- map(c("AU02001"), process_plate, data_path = data_path)
-
-
-  
-#res <- map(c("AU01901","AU02001","AU02002", "AU02101"), process_plate)
-#res <- map(c("AU01501","AU01601","AU01701","AU01702","AU01801","AU01802","AU01901","AU01902","AU02001","AU02002","AU02101","AU02301","AU02401", "AU02501"), process_plate)
 
 ```
