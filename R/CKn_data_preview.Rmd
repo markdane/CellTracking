@@ -560,35 +560,8 @@ compare_to_CP <- function(plateID, l2){
 
 
 
-```{r visualize_data}
-
-process_plate<- function(plateID, ...){
-  datasets <- create_level_2_data(plateID, data_path = data_path)
-  #datasets <- create_level_2_data(plateID, data_path = data_path)
-
-  #process track files
-  generate_plots(plateID, datasets$l1, datasets$l2)
-  generate_lineage_plots(plateID, datasets$l1, datasets$l2)
- #compare_to_CP(plateID, l2)
-}
-
-data_path <- "/home/exacloud/gscratch/HeiserLab/images/"
-#data_path <- "/Users/dane/Documents/CellTrackingProjects/AU565/images/"
-pipeline_name <- "CKn"
-plateID <- "AU02001"
-
-datasets <- create_level_2_data(plateID, data_path = data_path)
-
-res <- map(c("AU02001"), process_plate, data_path = data_path)
-
-
-  
-#res <- map(c("AU01901","AU02001","AU02002", "AU02101"), process_plate)
-#res <- map(c("AU01501","AU01601","AU01701","AU01702","AU01801","AU01802","AU01901","AU01902","AU02001","AU02002","AU02101","AU02301","AU02401", "AU02501"), process_plate)
-
-```
-
 ```{r lineage_plot, fig.height=12}
+
 
 generate_lineage_plots <- function(plateID, l1, l2){
   #Use the l1 data to create lineage plots of each movie
@@ -661,7 +634,7 @@ df_lineage_labels <- df_plateID_well_field %>%
   #geom_path() +
   geom_point(size = 1, shape = 21, stroke = .1)+
  # geom_vline(xintercept = 2460, color = "lightgray") +
-  scale_fill_manual(values=rep(brewer.pal(8,"Dark2"),times=200)) +
+  scale_fill_manual(values=rep(brewer.pal(8,"Dark2"),times=400)) +
   scale_color_manual(values = c("G1" = "transparent", "S/G2" = "black"))+
   guides(color = "none", fill = "none") +
   labs(title = paste("T0 lineages -",unique(df_lineage_labels$Drug1),"field",unique(df_lineage_labels$field)),
@@ -687,4 +660,33 @@ res <- create_lineage_pdf(l1, plateID, "C2", 1)
 res <- create_lineage_pdf(l1, plateID, "C2", 2)
 }
 
+```
+
+```{r visualize_data}
+
+process_plate<- function(plateID, ...){
+  datasets <- create_level_2_data(plateID, data_path = data_path)
+  #datasets <- create_level_2_data(plateID, data_path = data_path)
+
+  #process track files
+  generate_plots(plateID, datasets$l1, datasets$l2)
+  generate_lineage_plots(plateID, datasets$l1, datasets$l2)
+ #compare_to_CP(plateID, l2)
+}
+
+data_path <- "/home/exacloud/gscratch/HeiserLab/images/"
+data_path <- "/Users/dane/Documents/CellTrackingProjects/AU565/images/"
+pipeline_name <- "CKn"
+plateID <- "AU02001"
+
+
+
+datasets <- create_level_2_data(plateID, data_path = data_path)
+
+res <- map(c("AU02001"), process_plate, data_path = data_path)
+
+
+  
+#res <- map(c("AU01901","AU02001","AU02002", "AU02101"), process_plate)
+#res <- map(c("AU01501","AU01601","AU01701","AU01702","AU01801","AU01802","AU01901","AU01902","AU02001","AU02002","AU02101","AU02301","AU02401", "AU02501"), process_plate)
 ```
