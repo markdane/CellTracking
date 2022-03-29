@@ -143,7 +143,7 @@ create_level_2_data <- function(plateID, data_path = "/home/exacloud/gscratch/He
 
   if(!file.exists(l1_data_path)){
     print(paste("creating new level 1 file for",plateID))
-    l1_data <- map_dfr(dir(paste0(data_path,plateID,"/Analysis/",pipeline_name),pattern = paste0(plateID,"_.*_level_1.csv"), full.names = TRUE)[1:2], read_csv,
+    l1_data <- map_dfr(dir(paste0(data_path,plateID,"/Analysis/",pipeline_name),pattern = paste0(plateID,"_.*_level_1.csv"), full.names = TRUE), read_csv,
               col_types =cols(.default = "c",
                               Nuclei_CKn_CC_mean_intensity = col_double(),
                               Nuclei_CKn_CC_max_intensity = col_double(),
@@ -185,7 +185,7 @@ create_level_2_data <- function(plateID, data_path = "/home/exacloud/gscratch/He
             # treatment = factor(treatment, levels = treatment_levels, ordered = TRUE),
              cell_cycle_state = case_when(Cell_CKn_CC_mean_intensity_ratio <= g1_threshold ~"G1",
                                           Cell_CKn_CC_mean_intensity_ratio > g1_threshold ~"S/G2")) %>%
-      filter(!elapsed_minutes %in% c()) 
+      filter(!elapsed_minutes %in% c(0, 30, 60, 90, 120, 150, 180, 210, 240)) 
     
      #add in lineage tracks data
   tracks_df <- map_dfr(dir(paste0(data_path, plateID), pattern = "tracks.csv", recursive = TRUE, full.names = TRUE),
