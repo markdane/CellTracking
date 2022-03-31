@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[ ]:
+# In[2]:
 
 
 #setup libraries
@@ -18,7 +18,7 @@ from PIL import Image, ImageSequence
 import tifffile
 
 
-# In[ ]:
+# In[3]:
 
 
 pipeline_name = "CKn" #cellpose and KIT tracking
@@ -27,9 +27,9 @@ ch2_name = 'CC'
 data_path = '/home/exacloud/gscratch/HeiserLab/images/'
 #data_path = '/Users/dane/Documents/CellTrackingProjects/AU565/images/'
 plateID = 'AU02001'
-plateID = sys.argv[1]
-well_index = 1
-well_index = int(sys.argv[2])
+#plateID = sys.argv[1]
+well_index = 21
+#well_index = int(sys.argv[2])
 
 output_path = os.path.join(data_path+plateID,"Analysis",pipeline_name,"intermediate_files/")
 transformation_path = os.path.join(output_path,"transformations")
@@ -56,7 +56,8 @@ subdirectories = sorted(glob.glob(os.path.join(well_directory,"field_[1-9]")))
 # In[ ]:
 
 
-flourescent_scaler = 255/4095 #rescale from 12 to 8 bits
+#fluorescent_scaler = 255/4095 #rescale from 12 to 8 bits
+fluorescent_scaler = 1
 
 for subdir in subdirectories:
     field = re.findall("field_[1-9]",subdir)[0]
@@ -64,7 +65,7 @@ for subdir in subdirectories:
     reg_filename = os.path.join(output_path,plateID+"_R_"+well+"_"+field_num+"_reg_stack.tif")
     # Only process the field-level image files if there is no registered stack
     if not os.path.exists(reg_filename):
-        print("registering R stack in "+subdir)
+        print("Gathering image stacks for "+subdir)
         #load and prepare red, green and phase channels. Scale for 8 bits but these are uint16 data types
         r_data_paths = glob.glob(os.path.join(subdir,"*_R_*m.tif"))
         r_time_slices = set()
@@ -87,15 +88,16 @@ for subdir in subdirectories:
             g_data_paths_c.append(os.path.join(data_path+plateID,well,field,plateID+"_G_"+well+"_"+field_num+"_"+time_slice+".tif"))
             p_data_paths_c.append(os.path.join(data_path+plateID,well,field,plateID+"_P_"+well+"_"+field_num+"_"+time_slice+".tif"))
         img_r_ic = io.imread_collection(r_data_paths_c) # 3 dimensions : frames x width x height
-        img_rs = np.stack(img_r_ic)*flourescent_scaler
+        img_rs = np.stack(img_r_ic)*fluorescent_scaler
 
         img_g_ic = io.imread_collection(g_data_paths_c) # 3 dimensions : frames x width x height
-        img_gs = np.stack(img_g_ic)*flourescent_scaler
+        img_gs = np.stack(img_g_ic)*fluorescent_scaler
 
         img_p_ic = io.imread_collection(p_data_paths_c) # 3 dimensions : frames x width x height
         img_ps = np.stack(img_p_ic)
         
         #register the R stack using transformation
+        print("Determining registration transformations for "+subdir)
         sr = StackReg(StackReg.TRANSLATION)
         # register each frame to the previous (already registered) one
         tmats = sr.register_stack(img_rs, reference='previous', axis = 0)
@@ -104,6 +106,7 @@ for subdir in subdirectories:
         np.save(os.path.join(transformation_path,plateID+"_"+well+"_"+field+"_transformation_matrices.npy"), tmats)
         
         # transform stack using the tmats loaded from file
+        print("Using transformations to register all stacks for "+subdir)
         img_rs_reg = sr.transform_stack(img_rs, tmats = tmats)
         img_gs_reg = sr.transform_stack(img_gs, tmats = tmats)
         img_ps_reg = sr.transform_stack(img_ps, tmats = tmats)
@@ -121,11 +124,12 @@ for subdir in subdirectories:
         #assume transformations are in pixels and crop images to exclude areas that are outside of any registered image
         x_axis_length = img_rs_reg.shape[2]
         y_axis_length = img_rs_reg.shape[1]
+        print("Cropping to active areas for "+subdir)
         
         img_rs_reg_crop = img_rs_reg[:,-y_min:(y_axis_length-y_max),-x_min:(x_axis_length-x_max)]
         img_gs_reg_crop = img_gs_reg[:,-y_min:(y_axis_length-y_max),-x_min:(x_axis_length-x_max)]
         img_ps_reg_crop = img_ps_reg[:,-y_min:(y_axis_length-y_max),-x_min:(x_axis_length-x_max)]
-        
+        print("Saving stacks to disk for "+subdir)
         io.imsave(reg_filename, img_rs_reg_crop.astype(np.int16), plugin='tifffile', check_contrast=False)
         io.imsave(reg_filename.replace("_R_","_G_"), img_gs_reg_crop.astype(np.int16), plugin='tifffile', check_contrast=False)
         io.imsave(reg_filename.replace("_R_","_P_"), img_ps_reg_crop.astype(np.int16), plugin='tifffile', check_contrast=False)
@@ -138,7 +142,7 @@ for subdir in subdirectories:
 # Save the mask files as an image sequence  
 # For compatibility with the tracking method, save the masks and the nuclear intensity images as indivdual files  
 
-# In[ ]:
+# In[7]:
 
 
 n_diameter = 13
@@ -175,6 +179,7 @@ for subdir in subdirectories:
             os.makedirs(tracking_path+well+"/"+field+"/filtered_masks")
 
     if not os.path.exists(mask_filename): #Only segment if no mask file
+        print("Start segmenting "+reg_filename)
         img_rs_reg = io.imread(reg_filename)
         n_mask_images = []
         for i, image in enumerate(img_rs_reg):
@@ -200,6 +205,7 @@ for subdir in subdirectories:
         app = []
  
         # iterate over the mask stack and save each frame to disk:
+        print("Save individual nuclear masks to disk for "+reg_filename)
         for fr in ImageSequence.Iterator(im):
             app.append(fr)
             fr.save(tracking_path+well+"/"+field+"/nuc_masks/"+"mask%03.d.tif"%i)
