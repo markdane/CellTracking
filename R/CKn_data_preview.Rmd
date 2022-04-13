@@ -202,6 +202,7 @@ process_tracks_file)
       if(any("G1" %in% x)) G1_proportion <- table(x)[["G1"]]/length(x)
       return(G1_proportion)
       }
+
     l2 <- l1 %>%
       group_by(plateID, well, field, elapsed_minutes, treatment, drugs, Drug1,
                Drug1Concentration, Drug2, Drug2Concentration) %>%
@@ -212,6 +213,8 @@ process_tracks_file)
                 Cell_CKn_CC_max_intensity_ratio=mean(Cell_CKn_CC_max_intensity_ratio),
                 Cell_CKn_CC_min_intensity_ratio=mean(Cell_CKn_CC_min_intensity_ratio),
                 G1_proportion=G1_prop(cell_cycle_state),
+
+
                 .groups = "drop")
     
     #normalize to earliest time point
@@ -680,7 +683,7 @@ process_plate<- function(plateID, ...){
 }
 
 data_path <- "/home/exacloud/gscratch/HeiserLab/images/"
-data_path <- "/Users/dane/Documents/CellTrackingProjects/AU565/images/"
+#data_path <- "/Users/dane/Documents/CellTrackingProjects/AU565/images/"
 pipeline_name <- "CKn"
 plateID <- "AU02001"
 
