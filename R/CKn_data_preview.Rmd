@@ -197,6 +197,11 @@ process_tracks_file)
     
     l1 <- read_process_l1_data(l1_data_path)
     
+    G1_prop <- function(x){
+      G1_proportion <- 0
+      if(any("G1" %in% x)) G1_proportion <- table(x)[["G1"]]/length(x)
+      return(G1_proportion)
+      }
     l2 <- l1 %>%
       group_by(plateID, well, field, elapsed_minutes, treatment, drugs, Drug1,
                Drug1Concentration, Drug2, Drug2Concentration) %>%
@@ -206,7 +211,7 @@ process_tracks_file)
                 Cell_CKn_CC_mean_intensity_ratio=mean(Cell_CKn_CC_mean_intensity_ratio),
                 Cell_CKn_CC_max_intensity_ratio=mean(Cell_CKn_CC_max_intensity_ratio),
                 Cell_CKn_CC_min_intensity_ratio=mean(Cell_CKn_CC_min_intensity_ratio),
-                G1_proportion = table(cell_cycle_state)[["G1"]]/n,
+                G1_proportion=G1_prop(cell_cycle_state),
                 .groups = "drop")
     
     #normalize to earliest time point
@@ -495,7 +500,7 @@ cols <- c("BEZ235_1" = "cornflowerblue", "Cabozantinib_50" = "cornflowerblue", "
   #   theme_bw()
   # p
   
-  pdf(paste0("../plots/",plateID,"_QA.pdf"), width = 10, height = 14)
+  pdf(paste0(data_path,plateID,"/Analysis/",pipeline_name,"/plots/",plateID,"_QA.pdf"), width = 10, height = 14)
   # print(p_n_t_T0_mean)
   # print(p_G1_t_mean)
   print(p_densities)
@@ -548,7 +553,7 @@ compare_to_CP <- function(plateID, l2){
     facet_grid(well~field)
   p_PIvsCP
   
-  pdf(paste0("../plots/",plateID,"_cell_count_pipeline_comparison.pdf"), height = 24)
+  pdf(paste0(data_path,plateID,"/Analysis/",pipeline_name,"/plots/",plateID,"_cell_count_pipeline_comparison.pdf"), height = 24)
   print(p_CKn_CP)
   print(p_PIvsCP)
   res <- dev.off()
@@ -646,7 +651,7 @@ df_lineage_labels <- df_plateID_well_field %>%
         axis.ticks.y = element_blank()) 
 p_lineages_state
 
-pdf(paste0("../plots/",plateID,"_",wll,"_", fld,"_lineage_plot.pdf"), height = 30)
+pdf(paste0(data_path,plateID,"/Analysis/",pipeline_name,"/plots/",plateID,"_",wll,"_", fld,"_lineage_plot.pdf"), height = 30)
 #print(p_gen_0_cells)
 #print(p_lineages_paths)
 print(p_lineages_state)
