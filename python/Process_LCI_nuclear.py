@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[2]:
+# In[1]:
 
 
 #setup libraries
@@ -13,12 +13,13 @@ import matplotlib.pyplot as plt
 #import imageio
 from cellpose import models, plot
 from pystackreg import StackReg
-from scipy import stats
+from scipy import stats, spatial
 from PIL import Image, ImageSequence
 import tifffile
+from sklearn.decomposition import PCA
 
 
-# In[3]:
+# In[2]:
 
 
 pipeline_name = "CKn" #cellpose and KIT tracking
@@ -26,10 +27,10 @@ ch1_name = 'NR'
 ch2_name = 'CC'
 data_path = '/home/exacloud/gscratch/HeiserLab/images/'
 #data_path = '/Users/dane/Documents/CellTrackingProjects/AU565/images/'
-plateID = 'AU02001'
-#plateID = sys.argv[1]
-well_index = 21
-#well_index = int(sys.argv[2])
+plateID = 'AU01501'
+plateID = sys.argv[1]
+well_index = 1
+well_index = int(sys.argv[2])
 
 output_path = os.path.join(data_path+plateID,"Analysis",pipeline_name,"intermediate_files/")
 transformation_path = os.path.join(output_path,"transformations")
@@ -53,7 +54,7 @@ subdirectories = sorted(glob.glob(os.path.join(well_directory,"field_[1-9]")))
 # 
 # TODO: See if it's possible to not rescale the images  
 
-# In[ ]:
+# In[3]:
 
 
 #fluorescent_scaler = 255/4095 #rescale from 12 to 8 bits
@@ -142,7 +143,7 @@ for subdir in subdirectories:
 # Save the mask files as an image sequence  
 # For compatibility with the tracking method, save the masks and the nuclear intensity images as indivdual files  
 
-# In[7]:
+# In[4]:
 
 
 n_diameter = 13
@@ -229,7 +230,7 @@ for subdir in subdirectories:
 # Use the KIT-Loeffler tracking method to track the nuclei    
 # The tracking output includes masks with new label values and a res_track.txt file as described below  
 
-# In[ ]:
+# In[5]:
 
 
 for subdir in subdirectories: #track all fileds in the well
@@ -263,7 +264,7 @@ for subdir in subdirectories: #track all fileds in the well
 # well - Character string of the well such as A1  
 # field - Integer of the image field within the well  
 
-# In[ ]:
+# In[6]:
 
 
 #set filter parameters
@@ -297,38 +298,37 @@ for subdir in subdirectories:
 # Use the filtered tracks to remove masks for non-cell objects  
 # Save the filtered masks as individual image files in filtered_masks directory   
 
-# In[ ]:
+# In[10]:
 
 
 #loop through the fields in the well
 for subdir in subdirectories:
     field = re.findall("field_[1-9]",subdir)[0]
-    res_flt_filename = os.path.join(output_path,"tracking",well,field,"results","tracks.csv")
     mask_track_path = os.path.join(output_path,"tracking",well,field,"results")
-   #read in the tracks file for this field
-    tracks = pd.read_csv(res_flt_filename) 
-    #loop through the mask images in the field
     tracked_mask_filenames = sorted(glob.glob(mask_track_path+"/mask*"))
-    # iterate over the mask files
-    for fn in tracked_mask_filenames:
-        #read in the mask image
-        im = io.imread(fn)
-        #replace any label that's not a cell with a 0 value
-        cell_labels = np.array([x if x in tracks.label.to_numpy()
-                                   else 0 for x in range(0, im.max()+1)])
-        im_filtered = cell_labels[im]
-        
-        io.imsave(fn.replace("results","filtered_masks"), im_filtered.astype(np.int16), plugin='tifffile', check_contrast=False)
-        
+    #condition on whether the filtered masks exist
+    if not os.path.exists(tracked_mask_filenames[0].replace("results","filtered_masks")):
+       #read in the tracks file for this field    
+        res_flt_filename = os.path.join(output_path,"tracking",well,field,"results","tracks.csv")
+        tracks = pd.read_csv(res_flt_filename) 
+        #loop through the mask images in the field
+        for fn in tracked_mask_filenames:
+            #read in the mask image
+            im = io.imread(fn)
+            #replace any label that's not a cell with a 0 value
+            cell_labels = np.array([x if x in tracks.label.to_numpy()
+                                       else 0 for x in range(0, im.max()+1)])
+            im_filtered = cell_labels[im]
+            io.imsave(fn.replace("results","filtered_masks"), im_filtered.astype(np.int16), plugin='tifffile', check_contrast=False)
 
 
 # #### Get excel metadata file  
 # If this file does not exists, cretae a level 0 file that is data only  
 
-# In[ ]:
+# In[8]:
 
 
-#If the metadata exists, join it to the data and write out as a level 1 file
+#If the metadata exists, load it
 metadata_filename = os.path.join(data_path,plateID,"metadata",plateID+".xlsx")
 
 if os.path.exists(metadata_filename):
@@ -363,102 +363,151 @@ if os.path.exists(metadata_filename):
 # 
 # 
 
-# In[ ]:
+# In[81]:
 
 
 cyto_expansion = 5
 minutes_between_images = 30
+g1_threshold = .82
+neighborhood_nuclei_distance = 5
+neighborhood_radius_near = 20
+neighborhood_radius_medium = 45
+neighborhood_radius_far = 70
+
+def calc_G1_prop(x):
+    G1_count = x.value_counts()[1] #G1
+    G1_prop = G1_count/len(x)
+    return G1_prop
 
 #loop through the fields in the well
-
 for subdir in subdirectories:
     field = re.findall("field_[1-9]",subdir)[0]
-    filtered_mask_path = os.path.join(output_path,"tracking",well,field,"filtered_masks")
-    tracked_mask_filenames = sorted(glob.glob(filtered_mask_path+"/mask*"))
     l0_filename = os.path.join(data_path+plateID,"Analysis",pipeline_name,plateID+"_"+well+"_"+field+"_level_0.csv")
-    img_gs_reg = io.imread(output_path+plateID+"_G_"+well+"_"+field.replace("field_","")+"_reg_stack.tif")
-    # iterate over the mask files
-    results = []
-    for i, fn in enumerate(tracked_mask_filenames):
-        #read in the mask image
-        masks = io.imread(fn)
-        #read in registered R images
-        reg_fn = fn.replace("filtered_masks","reg")
-        image = io.imread(reg_fn.replace("mask","t"))
 
-        #measure reporter intensity and nuclear morphology, texture
-        nuclei = measure.regionprops_table(masks, intensity_image=image,
-                                           properties=('label',
-                                                       'area','bbox_area','convex_area','centroid','eccentricity','equivalent_diameter','extent','feret_diameter_max','filled_area',
-                                                        'major_axis_length','minor_axis_length','moments_hu','perimeter','perimeter_crofton','solidity',
-                                                        'mean_intensity','max_intensity','min_intensity'))#expand the masks to get cytoplasmic regions
-        nuclei_boundaries = segmentation.find_boundaries(masks, mode='thick')*masks
-        nuclei_expansions = segmentation.expand_labels(masks, cyto_expansion) - masks + nuclei_boundaries
-    
-        # measure nuclear and cytoplasmic intensities and textures in the green channel
-        nuclei_g = measure.regionprops_table(masks, intensity_image=img_gs_reg[i],
-                                             properties=('label','centroid',
-                                                         'mean_intensity','max_intensity','min_intensity'))
-        nuclei_exp_g = measure.regionprops_table(nuclei_expansions, intensity_image=img_gs_reg[i],
+    #condition on whether the l1 file exists
+    if not os.path.exists(l0_filename.replace('level_0','level_1')):
+        filtered_mask_path = os.path.join(output_path,"tracking",well,field,"filtered_masks")
+        tracked_mask_filenames = sorted(glob.glob(filtered_mask_path+"/mask*"))
+        img_gs_reg = io.imread(output_path+plateID+"_G_"+well+"_"+field.replace("field_","")+"_reg_stack.tif")
+        # iterate over the mask files
+        results = []
+        for i, fn in enumerate(tracked_mask_filenames):
+            #read in the mask image
+            masks = io.imread(fn)
+            #read in registered R images
+            reg_fn = fn.replace("filtered_masks","reg")
+            image = io.imread(reg_fn.replace("mask","t"))
+
+            #measure reporter intensity and nuclear morphology, texture
+            nuclei = measure.regionprops_table(masks, intensity_image=image,
+                                               properties=('label',
+                                                           'area','bbox_area','convex_area','centroid','eccentricity','equivalent_diameter','extent','feret_diameter_max','filled_area',
+                                                            'major_axis_length','minor_axis_length','moments_hu','perimeter','perimeter_crofton','solidity',
+                                                            'mean_intensity','max_intensity','min_intensity'))#expand the masks to get cytoplasmic regions
+            nuclei_boundaries = segmentation.find_boundaries(masks, mode='thick')*masks
+            nuclei_expansions = segmentation.expand_labels(masks, cyto_expansion) - masks + nuclei_boundaries
+
+            # measure nuclear and cytoplasmic intensities and textures in the green channel
+            nuclei_g = measure.regionprops_table(masks, intensity_image=img_gs_reg[i],
                                                  properties=('label','centroid',
                                                              'mean_intensity','max_intensity','min_intensity'))
-    
-        # turn results into a dataframe
-        nuclei_data = pd.DataFrame(nuclei)
-        nuclei_data.rename(columns={col: 'Nuclei_'+pipeline_name+'_' +ch1_name+'_'+col  for col in nuclei_data.columns if col not in ['label']}, inplace=True)
-   
-        nuclei_g_data = pd.DataFrame(nuclei_g)
-        nuclei_g_data.rename(columns={col: 'Nuclei_'+pipeline_name+'_' +ch2_name+'_'+col  for col in nuclei_g_data.columns if col not in ['label']}, inplace=True)
-    
+            nuclei_exp_g = measure.regionprops_table(nuclei_expansions, intensity_image=img_gs_reg[i],
+                                                     properties=('label','centroid',
+                                                                 'mean_intensity','max_intensity','min_intensity'))
 
-        nuclei_exp_g_data = pd.DataFrame(nuclei_exp_g)
-        nuclei_exp_g_data.rename(columns={col: 'Cyto_'+pipeline_name+'_' +ch2_name+'_'+col  for col in nuclei_exp_g_data.columns if col not in ['label']}, inplace=True)
-       
-        # recover the well and field values and add them to the dataframe
-        well = re.findall('/[A-Z][0-9]+/',reg_fn)[0]
-        well = re.sub('/','', well)
-        nuclei_data['well'] = well
-        field = re.findall('field_[0-9]+',reg_fn)[0]
-        field = int(re.sub('field_','', field))
-        nuclei_data['field'] = field
-        nuclei_data['slice'] = i
-        elapsed_minutes = i*minutes_between_images #assumes time slice numbering starts at 1
-        day = np.floor(elapsed_minutes/(24*60)).astype(int)
-        hour = np.floor((elapsed_minutes-day*(24*60))/60).astype(int)
-        minute = np.floor(elapsed_minutes-day*(24*60)-hour*60).astype(int)
-        day = str(day).zfill(2)
-        hour = str(hour).zfill(2)
-        minute = str(minute).zfill(2)
-        nuclei_data['time_slice'] = day+"d"+hour+"h"+minute+"m"
+            # turn results into a dataframe
+            nuclei_data = pd.DataFrame(nuclei)
+            nuclei_data.rename(columns={col: 'Nuclei_'+pipeline_name+'_' +ch1_name+'_'+col  for col in nuclei_data.columns if col not in ['label']}, inplace=True)
 
-        #Calculate ratio of ch2 cyto to nuclei intensities
-        nuclei_exp_g_data['Cell_'+pipeline_name+'_' +ch2_name+'_mean_intensity_ratio'] = nuclei_exp_g_data['Cyto_'+pipeline_name+'_' +ch2_name+'_mean_intensity']/nuclei_g_data['Nuclei_'+pipeline_name+'_' +ch2_name+'_mean_intensity']
-        nuclei_exp_g_data['Cell_'+pipeline_name+'_' +ch2_name+'_max_intensity_ratio'] = nuclei_exp_g_data['Cyto_'+pipeline_name+'_' +ch2_name+'_max_intensity']/nuclei_g_data['Nuclei_'+pipeline_name+'_' +ch2_name+'_max_intensity']
-        nuclei_exp_g_data['Cell_'+pipeline_name+'_' +ch2_name+'_min_intensity_ratio'] = nuclei_exp_g_data['Cyto_'+pipeline_name+'_' +ch2_name+'_min_intensity']/nuclei_g_data['Nuclei_'+pipeline_name+'_' +ch2_name+'_min_intensity']
+            nuclei_g_data = pd.DataFrame(nuclei_g)
+            nuclei_g_data.rename(columns={col: 'Nuclei_'+pipeline_name+'_' +ch2_name+'_'+col  for col in nuclei_g_data.columns if col not in ['label']}, inplace=True)
 
-        #concatenate the dataframes from the different channels
-        df = pd.merge(nuclei_data, nuclei_g_data, how="left", on=["label"])
-        df_all = pd.merge(df, nuclei_exp_g_data, how="left", on=["label"])
+            nuclei_exp_g_data = pd.DataFrame(nuclei_exp_g)
+            nuclei_exp_g_data.rename(columns={col: 'Cyto_'+pipeline_name+'_' +ch2_name+'_'+col  for col in nuclei_exp_g_data.columns if col not in ['label']}, inplace=True)
 
-        # append the dataframe to the results list
-        results.append(df_all)
-    
-    #concatenate all of the results from the sequences in the well
-    l0_image = pd.concat(results)
+            # recover the well and field values and add them to the dataframe
+            well = re.findall('/[A-Z][0-9]+/',reg_fn)[0]
+            well = re.sub('/','', well)
+            nuclei_data['well'] = well
+            field = re.findall('field_[0-9]+',reg_fn)[0]
+            field = int(re.sub('field_','', field))
+            nuclei_data['field'] = field
+            nuclei_data['slice'] = i
+            elapsed_minutes = i*minutes_between_images #assumes time slice numbering starts at 1
+            day = np.floor(elapsed_minutes/(24*60)).astype(int)
+            hour = np.floor((elapsed_minutes-day*(24*60))/60).astype(int)
+            minute = np.floor(elapsed_minutes-day*(24*60)-hour*60).astype(int)
+            day = str(day).zfill(2)
+            hour = str(hour).zfill(2)
+            minute = str(minute).zfill(2)
+            nuclei_data['time_slice'] = day+"d"+hour+"h"+minute+"m"
 
-    #join with the tracking results to get lineage, parent frame lenght values
-    tracks_filename = os.path.join(output_path,"tracking",well,"field_"+str(field),"results/tracks.csv")
-    tracks = pd.read_csv(tracks_filename)
-    l0 = pd.merge(l0_image, tracks, how="left", on=["label", "well", "field"])
+            #Calculate ratio of ch2 cyto to nuclei intensities
+            nuclei_exp_g_data['Cell_'+pipeline_name+'_' +ch2_name+'_mean_intensity_ratio'] = nuclei_exp_g_data['Cyto_'+pipeline_name+'_' +ch2_name+'_mean_intensity']/nuclei_g_data['Nuclei_'+pipeline_name+'_' +ch2_name+'_mean_intensity']
+            nuclei_exp_g_data['Cell_'+pipeline_name+'_' +ch2_name+'_max_intensity_ratio'] = nuclei_exp_g_data['Cyto_'+pipeline_name+'_' +ch2_name+'_max_intensity']/nuclei_g_data['Nuclei_'+pipeline_name+'_' +ch2_name+'_max_intensity']
+            nuclei_exp_g_data['Cell_'+pipeline_name+'_' +ch2_name+'_min_intensity_ratio'] = nuclei_exp_g_data['Cyto_'+pipeline_name+'_' +ch2_name+'_min_intensity']/nuclei_g_data['Nuclei_'+pipeline_name+'_' +ch2_name+'_min_intensity']
 
-    if os.path.exists(metadata_filename):
-        #merge data and metadata on well values
-        l1= pd.merge(l0, metadata, how="left", on=["well"]).round(decimals=2)
-        l1.to_csv(l0_filename.replace('level_0','level_1'), index = False)
-    else:
-        print("no metadata file for "+plateID+" so creating level 0 file")
-        l0 = l0.round(decimals=2)
-        l0.to_csv(l0_filename, index = False)
+            #label cell states based on the reporter ratio
+            nuclei_exp_g_data['cell_cycle_state'] = 'G1'
+            mask = nuclei_exp_g_data['Cell_'+pipeline_name+'_' +ch2_name+'_mean_intensity_ratio'] > g1_threshold
+            nuclei_exp_g_data.loc[mask, 'cell_cycle_state'] = 'S/G2'
+
+            #calculate the neighborhood density
+            #neighborhood_radius = neighborhood_nuclei_distance*nuclei_data['Nuclei_CKn_NR_equivalent_diameter'].mean().astype(int) #Should this be dynamic???
+            nuclei_kd = spatial.KDTree(nuclei_data[['Nuclei_CKn_NR_centroid-0','Nuclei_CKn_NR_centroid-1']])
+            nuclei_data['neighborhood_'+str(neighborhood_radius_near)] = nuclei_kd.query_ball_point(nuclei_data[['Nuclei_CKn_NR_centroid-0','Nuclei_CKn_NR_centroid-1']],
+                                                                                                    r = neighborhood_radius_near, return_sorted = True, return_length=True)
+            nuclei_data['neighborhood_'+str(neighborhood_radius_medium)] = nuclei_kd.query_ball_point(nuclei_data[['Nuclei_CKn_NR_centroid-0','Nuclei_CKn_NR_centroid-1']],
+                                                                                                    r = neighborhood_radius_medium, return_sorted = True, return_length=True)
+            nuclei_data['neighborhood_'+str(neighborhood_radius_far)] = nuclei_kd.query_ball_point(nuclei_data[['Nuclei_CKn_NR_centroid-0','Nuclei_CKn_NR_centroid-1']],
+                                                                                                    r = neighborhood_radius_far, return_sorted = True, return_length=True)
+            #merge the dataframes from the different channels
+            df = pd.merge(nuclei_data, nuclei_g_data, how="left", on=["label"])
+            df_all = pd.merge(df, nuclei_exp_g_data, how="left", on=["label"])
+
+            # append this image's dataframe to the results list
+            results.append(df_all)
+
+        #concatenate all of the results from all images in the field
+        l0_image = pd.concat(results)
+
+        #join with the tracking results to get lineage, parent frame lenght values
+        tracks_filename = os.path.join(output_path,"tracking",well,"field_"+str(field),"results/tracks.csv")
+        tracks = pd.read_csv(tracks_filename)
+        l0 = pd.merge(l0_image, tracks, how="left", on=["label", "well", "field"])
+        #label cell states based on the reporter ratio
+        l0['cell_cycle_state'] = 'G1'
+        mask = l0['Cell_CKn_CC_mean_intensity_ratio'] > g1_threshold
+        l0.loc[mask, 'cell_cycle_state'] = 'S/G2'
+
+
+        if os.path.exists(metadata_filename):
+            #merge data and metadata on well values
+            l1= pd.merge(l0, metadata, how="left", on=["well"]).round(decimals=2)
+            l1['treatment'] =  l1['Drug1']+'_'+l1['Drug1Concentration']+'_'+l1['Drug2']+'_'+l1['Drug2Concentration']
+            #filter out first 9 slices
+            l1 = l1[l1['slice'] > 9]
+            print("Writing "+l0_filename.replace('level_0','level_1') + " to disk")
+            l1.to_csv(l0_filename.replace('level_0','level_1'), index = False)
+            #summarize to image level
+            l2 = l1.groupby(['plateID','well','field', 'time_slice', 'Drug1','Drug1Concentration', 'Drug2', 'Drug2Concentration', 'treatment']).agg(
+                n = ('plateID', 'size'),
+                Nuclei_CKn_CC_mean_intensity=('Nuclei_CKn_CC_mean_intensity', 'mean'),
+                Cyto_CKn_CC_mean_intensity=('Cyto_CKn_CC_mean_intensity', 'mean'),
+                Cell_CKn_CC_mean_intensity_ratio=('Cell_CKn_CC_mean_intensity_ratio', 'mean'),
+                Cell_CKn_CC_max_intensity_ratio=('Cell_CKn_CC_max_intensity_ratio', 'mean'),
+                Cell_CKn_CC_min_intensity_ratio=('Cell_CKn_CC_min_intensity_ratio', 'mean'),
+                G1_proportion =('cell_cycle_state', calc_G1_prop),
+                neighborhood_20 = ('neighborhood_'+str(neighborhood_radius_near), 'mean'), #TODO figure out how to summarize with dynamic name
+                neighborhood_45 = ('neighborhood_'+str(neighborhood_radius_medium), 'mean'),
+                neighborhood_70 = ('neighborhood_'+str(neighborhood_radius_far), 'mean')
+            ).reset_index().round(decimals=2)
+            print("Writing "+l0_filename.replace('level_0','level_2') + " to disk")
+            l2.to_csv(l0_filename.replace('level_0','level_2'), index = False)
+        else:
+            print("no metadata file for "+plateID+" so creating level 0 file")
+            l0 = l0.round(decimals=2)
+            l0.to_csv(l0_filename, index = False)
 
 
 # In[ ]:
