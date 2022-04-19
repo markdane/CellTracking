@@ -213,8 +213,6 @@ process_tracks_file)
                 Cell_CKn_CC_max_intensity_ratio=mean(Cell_CKn_CC_max_intensity_ratio),
                 Cell_CKn_CC_min_intensity_ratio=mean(Cell_CKn_CC_min_intensity_ratio),
                 G1_proportion=G1_prop(cell_cycle_state),
-
-
                 .groups = "drop")
     
     #normalize to earliest time point
