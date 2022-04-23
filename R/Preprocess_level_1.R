@@ -212,7 +212,6 @@ PCA_analysis <- function(plateID){
 
 
 create_density_plots <- function(df){
-  l1_data_path <- paste0(data_path,plateID,"/Analysis/",pipeline_name,"/",plateID,"_level_1.csv")
   
   cols <- c("BEZ235_1" = "cornflowerblue", "Cabozantinib_50" = "cornflowerblue", "Trametinib_50" = "cornflowerblue",
             "BEZ235_2.5" = "darkcyan", "Cabozantinib_100" = "darkcyan","Trametinib_100" = "darkcyan",
@@ -258,6 +257,7 @@ create_density_plots <- function(df){
     filter(elapsed_minutes %in% selected_timepoints) %>%
     mutate(elapsed_hours = as.integer(elapsed_minutes)/60)
   
+  plateID <- unique(df_select$plateID)
   pdf(paste0(data_path, plateID, "/Analysis/",pipeline_name,"/plots/",plateID,"_density_plots.pdf"))
   
   p_densities <- ggplot(df_select, aes(Cell_CKn_CC_mean_intensity_ratio, fill = treatment, color = treatment)) +
