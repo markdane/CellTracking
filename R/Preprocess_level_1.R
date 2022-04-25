@@ -1,4 +1,5 @@
 library(tidyverse)
+library(viridis)
 
 calc_distance <- function(x, y){
   if( length(x) == 1) return(d=0)
@@ -59,7 +60,6 @@ read_plate_l1 <- function(plateID){
   print(paste("creating new level 1 file for ",plateID))
   l1_data <- map_dfr(dir(paste0(data_path,plateID,"/Analysis/",pipeline_name),pattern = paste0(plateID,"_.*_level_1.csv"), full.names = TRUE), read_csv, show_col_types = FALSE, lazy = FALSE,
                      col_types =cols(.default = "d",
-                                     Nuclei_CKn_CC_mean_intensity = col_double(),
                                      well = col_character(),
                                      time_slice = col_character(),
                                      cell_cycle_state = col_character(),
@@ -139,16 +139,13 @@ PCA_analysis <- function(plateID){
     princomp()
   scree <- screeplot(pca_obj)
   
-  df_pca <- df %>%
-    bind_cols(data.frame(pca_obj$scores[,1:10]))
-  
-  print(paste("writing level 1 subset file for ",plateID))
-  write_csv(df_pca, str_replace(l1_data_path, "level_1", "level_1_subset"))
-  
   df_pca_subset <- df_pca %>%
     group_by(plateID, well) %>%
-    slice_sample(prop = .01) %>%
+    slice_sample(prop = .2) %>%
     ungroup()
+  
+  plots_path <- paste0(data_path, plateID, "/Analysis/",pipeline_name,"/plots/")
+  if(!dir.exists(plots_path)) dir.create(plots_path)
   
   pdf(paste0(data_path, plateID, "/Analysis/",pipeline_name,"/plots/",plateID,"_PCA_plots.pdf"))
   p <- ggplot(df_pca_subset, aes(Comp.1, Comp.2, color = drugs)) +
@@ -210,40 +207,55 @@ PCA_analysis <- function(plateID){
   res <- dev.off()
 }
 
-
-create_density_plots <- function(df){
+create_density_plots <- function(plateID){
+  #browser()
+  l1_data_path <- paste0(data_path,plateID,"/Analysis/",pipeline_name,"/",plateID,"_level_1.csv")
   
-  cols <- c("BEZ235_1" = "cornflowerblue", "Cabozantinib_50" = "cornflowerblue", "Trametinib_50" = "cornflowerblue",
-            "BEZ235_2.5" = "darkcyan", "Cabozantinib_100" = "darkcyan","Trametinib_100" = "darkcyan",
-            "BEZ235_5" = "cadetblue4",   "Cabozantinib_250" = "cadetblue4", "Trametinib_250" = "cadetblue4",
-            "BEZ235_10" = "cadetblue", "Cabozantinib_500" = "cadetblue",  "Trametinib_500" = "cadetblue", 
-            "BEZ235_20" = "blue",  "Cabozantinib_1000" = "blue", "Trametinib_1000" = "blue",
-            "BEZ235_30" = "blue3",  "Cabozantinib_2500" = "blue3", "Trametinib_2500" = "blue3",
-            "BEZ235_50" = "darkblue", "Cabozantinib_5000" = "darkblue", "Trametinib_5000" = "darkblue",
-            "5FU_125" = "cornflowerblue", "5FU_250"= "darkcyan", "5FU_400" = "cadetblue4", "5FU_550" = "cadetblue",
-            "5FU_750" = "blue", "5FU_1000" = "blue3", "5FU_2500" = "darkblue", 
-            "AZD5438_50"= "cornflowerblue", "AZD5438_100"= "darkcyan", "AZD5438_250" = "cadetblue4",
-            "AZD5438_500" = "cadetblue", "AZD5438_1000" = "blue", "AZD5438_2500" = "blue3",
-            "AZD5438_5000" = "darkblue",
-            "Bortezomib_1" = "cornflowerblue", "Bortezomib_2.5"= "darkcyan", "Bortezomib_5" = "cadetblue4",
-            "Bortezomib_10" = "cadetblue","Bortezomib_20" = "blue", "Bortezomib_30" = "blue3","Bortezomib_50" = "darkblue",
-            "Doxorubicin_0.5" = "cornflowerblue", "Doxorubicin_1"= "darkcyan", "Doxorubicin_10" = "cadetblue4",
-            "Doxorubicin_25" = "cadetblue","Doxorubicin_50" = "blue", "Doxorubicin_125" = "blue3","Doxorubicin_250" = "darkblue",
-            "Panobinostat.5"= "cornflowerblue", "Panobinostat_1"= "darkcyan", "Panobinostat_2.5" = "cadetblue4",
-            "Panobinostat_5" = "cadetblue", "Panobinostat_6.5"  = "blue",  "Panobinostat_10" = "blue3",
-            "Panobinostat_12.5" = "darkblue",
-            "JQ1_50" = "cornflowerblue", "JQ1_100"= "darkcyan", "JQ1_250" = "cadetblue4", "JQ1_500" = "cadetblue",
-            "JQ1_1000" = "blue", "JQ1_2500" = "blue3", "JQ1_5000" = "darkblue", 
-            "MK1775_50" = "cornflowerblue", "MK1775_100"= "darkcyan", "MK1775_175" = "cadetblue4", "MK1775_275" = "cadetblue",
-            "MK1775_375" = "blue", "MK1775_500" = "blue3", "MK1775_700" = "darkblue",
-            "MG132_1" = "cornflowerblue", "MG132_2.5" = "darkcyan", "MG132_5" = "cadetblue4","MG132_10" = "cadetblue",
-            "MG132_20" = "blue", "MG132_30" = "blue3", "MG132_50" = "darkblue",
-            "Everolimus_50" = "cornflowerblue", "Everolimus_100"= "darkcyan", "Everolimus_250" = "cadetblue4",
-            "Everolimus_500" = "cadetblue", "Everolimus_1000" = "blue", "Everolimus_2500" = "blue3",
-            "Everolimus_5000" = "darkblue",
-            "Gemcitabine_0.25" = "cornflowerblue", "Gemcitabine_0.5"= "darkcyan", "Gemcitabine_1" = "cadetblue4",
-            "Gemcitabine_1.5" = "cadetblue","Gemcitabine_2"= "blue", "Gemcitabine_2.5" = "blue3","Gemcitabine_3" = "darkblue")
+  df <- datasets[[plateID]][["l1_subset"]]
+  
 
+  #dynamically assign consistent colors to the dosage concentrations
+  treatments <-df$treatment%>%
+    unique()  %>%
+    str_sort(numeric = TRUE)
+  idx <- which(treatments == "Untreated") # Positions of Untreated in df$treatement
+  treatments <- treatments[-idx]
+  treatments_colors <-  rep(viridis(7, direction = -1), length.out = length(treatments))
+  names(treatments_colors) <- treatments
+  cols <- c("Untreated"="royalblue", treatments_colors)
+  
+  
+  # cols <- c("BEZ235_1" = "cornflowerblue", "Cabozantinib_50" = "cornflowerblue", "Trametinib_50" = "cornflowerblue",
+  #           "BEZ235_2.5" = "darkcyan", "Cabozantinib_100" = "darkcyan","Trametinib_100" = "darkcyan",
+  #           "BEZ235_5" = "cadetblue4",   "Cabozantinib_250" = "cadetblue4", "Trametinib_250" = "cadetblue4",
+  #           "BEZ235_10" = "cadetblue", "Cabozantinib_500" = "cadetblue",  "Trametinib_500" = "cadetblue",
+  #           "BEZ235_20" = "blue",  "Cabozantinib_1000" = "blue", "Trametinib_1000" = "blue",
+  #           "BEZ235_30" = "blue3",  "Cabozantinib_2500" = "blue3", "Trametinib_2500" = "blue3",
+  #           "BEZ235_50" = "darkblue", "Cabozantinib_5000" = "darkblue", "Trametinib_5000" = "darkblue",
+  #           "5FU_125" = "cornflowerblue", "5FU_250"= "darkcyan", "5FU_400" = "cadetblue4", "5FU_550" = "cadetblue",
+  #           "5FU_750" = "blue", "5FU_1000" = "blue3", "5FU_2500" = "darkblue",
+  #           "AZD5438_50"= "cornflowerblue", "AZD5438_100"= "darkcyan", "AZD5438_250" = "cadetblue4",
+  #           "AZD5438_500" = "cadetblue", "AZD5438_1000" = "blue", "AZD5438_2500" = "blue3",
+  #           "AZD5438_5000" = "darkblue",
+  #           "Bortezomib_1" = "cornflowerblue", "Bortezomib_2.5"= "darkcyan", "Bortezomib_5" = "cadetblue4",
+  #           "Bortezomib_10" = "cadetblue","Bortezomib_20" = "blue", "Bortezomib_30" = "blue3","Bortezomib_50" = "darkblue",
+  #           "Doxorubicin_0.5" = "cornflowerblue", "Doxorubicin_1"= "darkcyan", "Doxorubicin_10" = "cadetblue4",
+  #           "Doxorubicin_25" = "cadetblue","Doxorubicin_50" = "blue", "Doxorubicin_125" = "blue3","Doxorubicin_250" = "darkblue",
+  #           "Panobinostat.5"= "cornflowerblue", "Panobinostat_1"= "darkcyan", "Panobinostat_2.5" = "cadetblue4",
+  #           "Panobinostat_5" = "cadetblue", "Panobinostat_6.5"  = "blue",  "Panobinostat_10" = "blue3",
+  #           "Panobinostat_12.5" = "darkblue",
+  #           "JQ1_50" = "cornflowerblue", "JQ1_100"= "darkcyan", "JQ1_250" = "cadetblue4", "JQ1_500" = "cadetblue",
+  #           "JQ1_1000" = "blue", "JQ1_2500" = "blue3", "JQ1_5000" = "darkblue",
+  #           "MK1775_50" = "cornflowerblue", "MK1775_100"= "darkcyan", "MK1775_175" = "cadetblue4", "MK1775_275" = "cadetblue",
+  #           "MK1775_375" = "blue", "MK1775_500" = "blue3", "MK1775_700" = "darkblue",
+  #           "MG132_1" = "cornflowerblue", "MG132_2.5" = "darkcyan", "MG132_5" = "cadetblue4","MG132_10" = "cadetblue",
+  #           "MG132_20" = "blue", "MG132_30" = "blue3", "MG132_50" = "darkblue",
+  #           "Everolimus_50" = "cornflowerblue", "Everolimus_100"= "darkcyan", "Everolimus_250" = "cadetblue4",
+  #           "Everolimus_500" = "cadetblue", "Everolimus_1000" = "blue", "Everolimus_2500" = "blue3",
+  #           "Everolimus_5000" = "darkblue",
+  #           "Gemcitabine_0.25" = "cornflowerblue", "Gemcitabine_0.5"= "darkcyan", "Gemcitabine_1" = "cadetblue4",
+  #           "Gemcitabine_1.5" = "cadetblue","Gemcitabine_2"= "blue", "Gemcitabine_2.5" = "blue3","Gemcitabine_3" = "darkblue")
+  
   #look at density plots of the cell cycle ratios per image
   #start with just the initial time point
   earliest_time_point <- unique(df$elapsed_minutes) %>%
@@ -269,18 +281,19 @@ create_density_plots <- function(df){
     theme_bw()
   
   if("cell_cycle_state_threshold" %in% colnames(df_select)){
+    cell_cycle_state_threshold <- unique(df_select$cell_cycle_state_threshold)
     p_densities <- p_densities +
-      geom_vline(xintercept = cell_cycle_state_threshold)
+      geom_vline(xintercept = .94)
   }
   print(p_densities)
-res <- dev.off()
-  }
+  res <- dev.off()
+}
 
 ###########
 
 data_path <-  "/home/exacloud/gscratch/HeiserLab/images/"
 pipeline_name <- "CKn"
-plateIDs <- c("AU02001" = "AU02001")
+plateIDs <- c("AU03501" = "AU03501")
 
 datasets <- map(plateIDs, read_plate_l1)
 res <- map(plateIDs, PCA_analysis)
