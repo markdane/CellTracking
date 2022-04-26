@@ -133,10 +133,18 @@ PCA_analysis <- function(plateID){
   l1_data_path <- paste0(data_path,plateID,"/Analysis/",pipeline_name,"/",plateID,"_level_1.csv")
   
   df <- datasets[[plateID]][["l1_subset"]]
+  
   pca_obj <- df %>%
     select(matches(pipeline_name), matches("neighborhood"), any_of(c("begins", "ends", "length"))) %>%
     select(-contains("centroid")) %>%
     princomp()
+  
+  df_pca_scores <- as_tibble(pca_obj$scores) %>%
+    rename_with(~gsub("Comp.", "PC", .x, fixed = TRUE)) %>%
+    select(num_range("PC", 1:10))
+  
+  df_pca <- bind_cols(df, df_pca_scores)
+  
   scree <- screeplot(pca_obj)
   
   df_pca_subset <- df_pca %>%
@@ -147,55 +155,58 @@ PCA_analysis <- function(plateID){
   plots_path <- paste0(data_path, plateID, "/Analysis/",pipeline_name,"/plots/")
   if(!dir.exists(plots_path)) dir.create(plots_path)
   
-  pdf(paste0(data_path, plateID, "/Analysis/",pipeline_name,"/plots/",plateID,"_PCA_plots.pdf"))
-  p <- ggplot(df_pca_subset, aes(Comp.1, Comp.2, color = drugs)) +
+  pdf(paste0(data_path, plateID, "/Analysis/",pipeline_name,"/plots/",plateID,"_PCA_plots.pdf"),useDingbats = FALSE)
+  
+  print(screeplot(pca_obj))
+  
+  p <- ggplot(df_pca_subset, aes(PC1, PC2, color = drugs)) +
     geom_point(size = .5, alpha = .3) +
     #coord_cartesian(xlim = c(-700,500), ylim = c(-300,300)) +
     guides(colour = guide_legend(override.aes = list(alpha = 1, size = 3))) +
     theme_bw()
   print(p)
   
-  p <- ggplot(df_pca_subset, aes(Comp.1, Comp.2, color = cell_cycle_state)) +
+  p <- ggplot(df_pca_subset, aes(PC1, PC2, color = cell_cycle_state)) +
     geom_point(size = .5, alpha = .3) +
     #coord_cartesian(xlim = c(-700,500), ylim = c(-300,300)) +
     guides(colour = guide_legend(override.aes = list(alpha = 1, size = 3))) +
     theme_bw()
   print(p)
   
-  p <- ggplot(df_pca_subset, aes(Comp.1, Comp.2, color = length)) +
+  p <- ggplot(df_pca_subset, aes(PC1, PC2, color = length)) +
     geom_point(size = .5, alpha = .3) +
     #coord_cartesian(xlim = c(-700,500), ylim = c(-300,300)) +
     guides(colour = guide_legend(override.aes = list(alpha = 1, size = 3))) +
     theme_bw()
   print(p)
   
-  p <- ggplot(df_pca_subset, aes(Comp.1, Comp.2, color = Cell_CKn_CC_mean_intensity_ratio)) +
+  p <- ggplot(df_pca_subset, aes(PC1, PC2, color = Cell_CKn_CC_mean_intensity_ratio)) +
     geom_point(size = .5, alpha = .3) +
     #coord_cartesian(xlim = c(-700,500), ylim = c(-300,300)) +
     guides(colour = guide_legend(override.aes = list(alpha = 1, size = 3))) +
     theme_bw()
   print(p)
   
-  p <- ggplot(df_pca_subset, aes(Comp.1, Comp.2, color = lineage)) +
+  p <- ggplot(df_pca_subset, aes(PC1, PC2, color = lineage)) +
     geom_point(size = .5, alpha = .3) +
     #coord_cartesian(xlim = c(-700,500), ylim = c(-300,300)) +
     guides(colour = guide_legend(override.aes = list(alpha = 1, size = 3))) +
     theme_bw()
   print(p)
   
-  p <- ggplot(df_pca_subset, aes(Comp.1, Comp.2, color = migration_distance)) +
+  p <- ggplot(df_pca_subset, aes(PC1, PC2, color = migration_distance)) +
     geom_point(size = .5, alpha = .3) +
     #coord_cartesian(xlim = c(-700,500), ylim = c(-300,300)) +
     guides(colour = guide_legend(override.aes = list(alpha = 1, size = 3))) +
     theme_bw()
   print(p)
   
-  p_contour <- ggplot(df_pca_subset, aes(x=Comp.1, y=Comp.2) ) +
+  p_contour <- ggplot(df_pca_subset, aes(x=PC1, y=PC2) ) +
     stat_density_2d(aes(fill = ..level..), geom = "polygon", colour="white") +
     theme_bw()
   print(p_contour)
   
-  p <- ggplot(df_pca_subset, aes(x=Comp.1, y=Comp.2) ) +
+  p <- ggplot(df_pca_subset, aes(x=PC1, y=PC2) ) +
     geom_density_2d_filled() +
     geom_density_2d(size = 0.25, colour = "black", bins = 25) +
     #coord_cartesian(xlim = c(-700,500), ylim = c(-300,300)) +
@@ -224,38 +235,6 @@ create_density_plots <- function(plateID){
   names(treatments_colors) <- treatments
   cols <- c("Untreated"="royalblue", treatments_colors)
   
-  
-  # cols <- c("BEZ235_1" = "cornflowerblue", "Cabozantinib_50" = "cornflowerblue", "Trametinib_50" = "cornflowerblue",
-  #           "BEZ235_2.5" = "darkcyan", "Cabozantinib_100" = "darkcyan","Trametinib_100" = "darkcyan",
-  #           "BEZ235_5" = "cadetblue4",   "Cabozantinib_250" = "cadetblue4", "Trametinib_250" = "cadetblue4",
-  #           "BEZ235_10" = "cadetblue", "Cabozantinib_500" = "cadetblue",  "Trametinib_500" = "cadetblue",
-  #           "BEZ235_20" = "blue",  "Cabozantinib_1000" = "blue", "Trametinib_1000" = "blue",
-  #           "BEZ235_30" = "blue3",  "Cabozantinib_2500" = "blue3", "Trametinib_2500" = "blue3",
-  #           "BEZ235_50" = "darkblue", "Cabozantinib_5000" = "darkblue", "Trametinib_5000" = "darkblue",
-  #           "5FU_125" = "cornflowerblue", "5FU_250"= "darkcyan", "5FU_400" = "cadetblue4", "5FU_550" = "cadetblue",
-  #           "5FU_750" = "blue", "5FU_1000" = "blue3", "5FU_2500" = "darkblue",
-  #           "AZD5438_50"= "cornflowerblue", "AZD5438_100"= "darkcyan", "AZD5438_250" = "cadetblue4",
-  #           "AZD5438_500" = "cadetblue", "AZD5438_1000" = "blue", "AZD5438_2500" = "blue3",
-  #           "AZD5438_5000" = "darkblue",
-  #           "Bortezomib_1" = "cornflowerblue", "Bortezomib_2.5"= "darkcyan", "Bortezomib_5" = "cadetblue4",
-  #           "Bortezomib_10" = "cadetblue","Bortezomib_20" = "blue", "Bortezomib_30" = "blue3","Bortezomib_50" = "darkblue",
-  #           "Doxorubicin_0.5" = "cornflowerblue", "Doxorubicin_1"= "darkcyan", "Doxorubicin_10" = "cadetblue4",
-  #           "Doxorubicin_25" = "cadetblue","Doxorubicin_50" = "blue", "Doxorubicin_125" = "blue3","Doxorubicin_250" = "darkblue",
-  #           "Panobinostat.5"= "cornflowerblue", "Panobinostat_1"= "darkcyan", "Panobinostat_2.5" = "cadetblue4",
-  #           "Panobinostat_5" = "cadetblue", "Panobinostat_6.5"  = "blue",  "Panobinostat_10" = "blue3",
-  #           "Panobinostat_12.5" = "darkblue",
-  #           "JQ1_50" = "cornflowerblue", "JQ1_100"= "darkcyan", "JQ1_250" = "cadetblue4", "JQ1_500" = "cadetblue",
-  #           "JQ1_1000" = "blue", "JQ1_2500" = "blue3", "JQ1_5000" = "darkblue",
-  #           "MK1775_50" = "cornflowerblue", "MK1775_100"= "darkcyan", "MK1775_175" = "cadetblue4", "MK1775_275" = "cadetblue",
-  #           "MK1775_375" = "blue", "MK1775_500" = "blue3", "MK1775_700" = "darkblue",
-  #           "MG132_1" = "cornflowerblue", "MG132_2.5" = "darkcyan", "MG132_5" = "cadetblue4","MG132_10" = "cadetblue",
-  #           "MG132_20" = "blue", "MG132_30" = "blue3", "MG132_50" = "darkblue",
-  #           "Everolimus_50" = "cornflowerblue", "Everolimus_100"= "darkcyan", "Everolimus_250" = "cadetblue4",
-  #           "Everolimus_500" = "cadetblue", "Everolimus_1000" = "blue", "Everolimus_2500" = "blue3",
-  #           "Everolimus_5000" = "darkblue",
-  #           "Gemcitabine_0.25" = "cornflowerblue", "Gemcitabine_0.5"= "darkcyan", "Gemcitabine_1" = "cadetblue4",
-  #           "Gemcitabine_1.5" = "cadetblue","Gemcitabine_2"= "blue", "Gemcitabine_2.5" = "blue3","Gemcitabine_3" = "darkblue")
-  
   #look at density plots of the cell cycle ratios per image
   #start with just the initial time point
   earliest_time_point <- unique(df$elapsed_minutes) %>%
@@ -283,57 +262,144 @@ create_density_plots <- function(plateID){
   if("cell_cycle_state_threshold" %in% colnames(df_select)){
     cell_cycle_state_threshold <- unique(df_select$cell_cycle_state_threshold)
     p_densities <- p_densities +
-      geom_vline(xintercept = .94)
+      geom_vline(xintercept = cell_cycle_state_threshold)
   }
   print(p_densities)
   res <- dev.off()
+}
+
+
+create_lineage_pdf <- function(plateID, wll, fld){
+  df <- datasets[[plateID]][["l1"]]
+  
+  df_plateID_well_field <- df %>%
+    filter(plateID == plateID,
+           well ==  wll,
+           field == fld)
+  
+  t0 <- unique(df_plateID_well_field$elapsed_minutes) %>% min()
+  
+  t0_lineages <- df_plateID_well_field %>%
+    filter(elapsed_minutes == t0) %>%
+    select(lineage) %>%
+    unique() %>%
+    drop_na() %>%
+    #slice_sample(prop = .5) %>%
+    pull()
+  
+  #make a complete lineage tree diagram
+  df_lineage_labels <- df_plateID_well_field %>%
+    filter(lineage %in%t0_lineages) %>%
+    arrange(lineage) %>%
+    mutate(lineage = factor(lineage),
+           lineage = fct_inorder(lineage),
+           lineage_label = paste0(lineage,"_",label))
+  
+  p_lineages_state <- ggplot(df_lineage_labels, aes(x = elapsed_minutes, y = lineage_label, group = label, fill = lineage, color = cell_cycle_state)) +
+    geom_point(size = 1, shape = 21, stroke = .1)+
+    scale_fill_manual(values=rep(brewer.pal(8,"Dark2"),times=400)) +
+    scale_color_manual(values = c("G1" = "transparent", "S/G2" = "black"))+
+    guides(color = "none", fill = "none") +
+    labs(title = paste("T0 lineages -",unique(df_lineage_labels$Drug1),"field",unique(df_lineage_labels$field)),
+         subtitle = "S/G2 shown with black outline") +
+    ylab("Cells colored by lineage") +
+    theme_classic() +
+    theme(axis.text.y = element_blank(),
+          axis.line.y = element_blank(),
+          axis.ticks.y = element_blank()) 
+  p_lineages_state
+  
+  pdf(paste0(data_path, plateID, "/Analysis/",pipeline_name,"/plots/",plateID,"_",wll,"_", fld,"_lineage_plot.pdf"), height = 30,useDingbats = FALSE)
+  print(p_lineages_state)
+  res <- dev.off()
+}
+
+
+generate_lineage_plots <- function(plateID){
+#Use the l1 data to create lineage plots of each movie
+  selected_field <- 1
+
+  df <- datasets[[plateID]][["l1"]]
+
+  t0 <- unique(df$elapsed_minutes) %>% min()
+
+  t0_lineages <- df %>%
+    filter(elapsed_minutes == t0) %>%
+    select(lineage) %>%
+    unique() %>%
+    drop_na() %>%
+    slice_sample(prop = .1) %>%
+    pull()
+
+  df_t0_cells <- df %>%
+    select(plateID, well, field, slice, time_slice, elapsed_minutes, day,hour, minute, treatment, label, begins, ends, parent, length, lineage, Drug1, Drug1Concentration, Cell_CKn_CC_mean_intensity_ratio,cell_cycle_state) %>%
+    filter(field == selected_field,
+           label %in% t0_lineages) %>%
+    arrange(length) %>%
+    mutate(label = factor(label),
+           label = fct_inorder(label))
+
+  #View the generation 0 cells colored by cell state
+  p_gen_0_cells <- ggplot(df_t0_cells, aes(x = elapsed_minutes, y = label, color = cell_cycle_state)) +
+    geom_path(size = .5) +
+    scale_color_manual(values = c("G1" = "black", "S/G2" = "red")) +
+    labs(title = "Generation 0 cells",
+         subtitle = "colored by cell cycle state") +
+    xlab("minutes") +
+    ylab("") +
+    theme_bw() +
+    theme(axis.ticks.y=element_blank(),
+          axis.text.y=element_blank())
+  p_gen_0_cells
+
+  #make a complete lineage tree diagram
+  df_lineage_labels <- df %>%
+    filter(lineage %in%t0_lineages) %>%
+    arrange(lineage) %>%
+    mutate(lineage = factor(lineage),
+           lineage = fct_inorder(lineage),
+           lineage_label = paste0(lineage,"_",label))
+
+  track_lengths<- df %>%
+    group_by(well, field, label) %>%
+    summarise(track_length = unique(length))
+
+  mean_track_length <- track_lengths %>%
+    group_by(well, field) %>%
+    summarise(mean_track_length = mean(track_length))
+  # %>%
+  #   filter(!(begins <3 & length < 6))
+
+  p_lineages_paths <- ggplot(df_lineage_labels, aes(x = elapsed_minutes, y = lineage_label, group = factor(label), color = factor(lineage))) +
+    geom_path() +
+    scale_color_manual(values=rep(brewer.pal(8,"Dark2"),times=10)) +
+    guides(color = "none") +
+    theme_classic() +
+    theme(axis.text.y = element_blank())
+  p_lineages_paths
+
 }
 
 ###########
 
 data_path <-  "/home/exacloud/gscratch/HeiserLab/images/"
 pipeline_name <- "CKn"
-plateIDs <- c("AU03501" = "AU03501")
+plateIDs <- c("AU03701" = "AU03701")
 
 datasets <- map(plateIDs, read_plate_l1)
 res <- map(plateIDs, PCA_analysis)
 res <- map(plateIDs, create_density_plots)
 
-# 
-# #Calculate umap object if it doesn't already exist
-# #Likely want to sample the data to get a reasonable run time
-# umap_obj <- umap(pca_obj$scores[,1:10])
-# 
-# l1_dr <- l1_subset %>%
-#   bind_cols(data.frame(pca_obj$scores[,1:10]),  data.frame(umap_obj$layout))
-#   
-# write_csv(l1_dr, file = paste0(data_path,plateID,"/Analysis/",pipeline_name,"/",plateID,"_umap.csv"))
-# 
-# p <- ggplot(l1_dr, aes(X1, X2)) +
-#   geom_point()
-# p
-# 
-# p <- ggplot(l1_dr, aes(X1, X2, color = slice)) +
-#   geom_point()
-# p
-# 
-# p <- ggplot(l1_dr, aes(X1, X2, color = Nuclei_CKn_NR_area )) +
-#   geom_point(alpha = .5, size = .8)
-# p
-# 
-# p <- ggplot(l1_dr, aes(X1, X2, color = begins )) +
-#   geom_point(alpha = .5, size = .8)
-# p
-# 
-# p <- ggplot(l1_dr, aes(X1, X2, color = length )) +
-#   geom_point(alpha = .5, size = .8)
-# p
-# 
-# p <- ggplot(l1_dr, aes(X1, X2, color = neighborhood_70 )) +
-#   geom_point(alpha = .5, size = .8)
-# p
-# 
-# p <- ggplot(l1_dr, aes(X1, X2, color = drugs)) +
-#   geom_point(alpha = .5, size = .8)
-# p
+res <- map(plateIDs, create_lineage_pdf, wll = "A1", fld = 2)
+res <- map(plateIDs, create_lineage_pdf, wll = "B1", fld = 2)
+res <- map(plateIDs, create_lineage_pdf, wll = "C1", fld = 2)
+res <- map(plateIDs, create_lineage_pdf, wll = "D2", fld = 2)
+res <- map(plateIDs, create_lineage_pdf, wll = "B3", fld = 2)
+res <- map(plateIDs, create_lineage_pdf, wll = "C3", fld = 2)
+res <- map(plateIDs, create_lineage_pdf, wll = "D4", fld = 2)
+res <- map(plateIDs, create_lineage_pdf, wll = "B5", fld = 2)
+res <- map(plateIDs, create_lineage_pdf, wll = "C5", fld = 2)
+res <- map(plateIDs, create_lineage_pdf, wll = "D6", fld = 2)
+
+
 
