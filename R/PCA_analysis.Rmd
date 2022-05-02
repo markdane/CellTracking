@@ -1,0 +1,75 @@
+---
+title: "AU565 PCA embedding"
+output: 
+  html_document:
+  code_folding: hide
+---
+
+```{r setup, include=FALSE, cache=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+
+library(tidyverse)
+
+```
+
+
+```{r get_data}
+
+l1 <- read_csv("../tables/AU565_PCA.csv")
+
+```
+
+```{r create_base_map}
+
+df <- l1 %>%
+  rename(PC1 = Comp.1,
+         PC2 = Comp.2) %>%
+  group_by(plateID, well) %>%
+  slice_sample(prop = .01) %>%
+  ungroup()
+
+p <- ggplot(df, aes(PC1, PC2, color = drugs)) +
+  geom_point(size = .5, alpha = .3) +
+    coord_cartesian(xlim = c(-700,500), ylim = c(-300,300)) +
+  guides(colour = guide_legend(override.aes = list(alpha = 1, size = 3))) +
+  theme_bw()
+p
+
+p <- ggplot(df, aes(PC1, PC2, color = cell_cycle_state)) +
+  geom_point(size = .5, alpha = .3) +
+    coord_cartesian(xlim = c(-700,500), ylim = c(-300,300)) +
+  guides(colour = guide_legend(override.aes = list(alpha = 1, size = 3))) +
+  theme_bw()
+p
+
+p <- ggplot(df, aes(PC1, PC2, color = length)) +
+  geom_point(size = .5, alpha = .3) +
+    coord_cartesian(xlim = c(-700,500), ylim = c(-300,300)) +
+  guides(colour = guide_legend(override.aes = list(alpha = 1, size = 3))) +
+  theme_bw()
+p
+
+
+p <- ggplot(df, aes(PC1, PC2, color = Cell_CKn_CC_mean_intensity_ratio)) +
+  geom_point(size = .5, alpha = .3) +
+    coord_cartesian(xlim = c(-700,500), ylim = c(-300,300)) +
+  guides(colour = guide_legend(override.aes = list(alpha = 1, size = 3))) +
+  theme_bw()
+p
+
+p_contour <- ggplot(df, aes(x=PC1, y=PC2) ) +
+  stat_density_2d(aes(fill = ..level..), geom = "polygon", colour="white") +
+  #scale_fill_continuous(type = "viridis") +
+  #coord_cartesian(xlim = c(-500,500), ylim = c(-300,300)) +
+  theme_bw()
+p_contour
+
+ggplot(df, aes(x=PC1, y=PC2) ) +
+ geom_density_2d_filled() +
+  geom_density_2d(size = 0.25, colour = "black", bins = 25) +
+    coord_cartesian(xlim = c(-700,500), ylim = c(-300,300)) +
+  guides(level = "none",
+         fill = "none") +
+  theme_bw()
+
+```
