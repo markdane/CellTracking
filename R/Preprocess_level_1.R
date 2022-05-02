@@ -109,8 +109,18 @@ read_plate_l1 <- function(plateID){
     mutate(migration_distance = calc_distance(.data[['Nuclei_CKn_NR_centroid-0']], .data[['Nuclei_CKn_NR_centroid-1']]),
            migration_direction = calc_direction(.data[['Nuclei_CKn_NR_centroid-0']], .data[['Nuclei_CKn_NR_centroid-1']])) %>%
     ungroup()
+  #latch cell cycle state after 2 consecutive G2/S calls
+  # determine_ccs_latch <-function(em, ratio, ccs){
+  #   browser()
+  #   return(ccs)
+  # }
   
+  # foo <- l1_data %>%
+  #   group_by(plateID, well, field, label) %>%
+  #   arrange(elapsed_minutes) %>%
+  #   mutate(cell_cycle_state_latch = determine_ccs_latch(elapsed_minutes, Cell_CKn_CC_mean_intensity_ratio,cell_cycle_state))
   #add in lineage tracks data
+  
   tracks_df <- map_dfr(dir(paste0(data_path, plateID,"/Analysis/",pipeline_name,"/intermediate_files/tracking/"), pattern = "tracks.csv", recursive = TRUE, full.names = TRUE),
                        process_tracks_file)
   l1 <- l1_data %>%
@@ -384,7 +394,7 @@ generate_lineage_plots <- function(plateID){
 
 data_path <-  "/home/exacloud/gscratch/HeiserLab/images/"
 pipeline_name <- "CKn"
-plateIDs <- c("AU03701" = "AU03701")
+plateIDs <- c("AU03501" = "AU03501")
 
 datasets <- map(plateIDs, read_plate_l1)
 res <- map(plateIDs, PCA_analysis)
@@ -401,5 +411,39 @@ res <- map(plateIDs, create_lineage_pdf, wll = "B5", fld = 2)
 res <- map(plateIDs, create_lineage_pdf, wll = "C5", fld = 2)
 res <- map(plateIDs, create_lineage_pdf, wll = "D6", fld = 2)
 
-
+show_cell_cycle_plots <- function(plateID){
+  df <- datasets[[plateID]][["l1"]]
+  
+  set.seed(42)
+  df_selected<- df %>%
+    group_by(plateID, well, field) %>%
+    filter(label %in% sample(unique(label), size = 5, replace = FALSE)) %>%
+    group_by(plateID, well, field, label) %>%
+    filter(elapsed_minutes == min(elapsed_minutes)) %>%
+    select(label,
+           elapsed_minutes,
+           Nuclei_CKn_NR_area,
+           cell_cycle_state) %>%
+    mutate(t0_Nuclei_CKn_NR_area = Nuclei_CKn_NR_area) %>%
+    select(plateID, well, field, label, t0_Nuclei_CKn_NR_area) %>%
+    left_join(df, by = c("plateID", "well", "field", "label"))  %>%
+    filter(migration_distance  < 5,
+           length>10) %>%
+    mutate(Nuclei_CKn_NR_area_t0norm = Nuclei_CKn_NR_area/t0_Nuclei_CKn_NR_area)
+  
+  p_cell_cycle_states <- ggplot(df_selected, aes(elapsed_minutes, Cell_CKn_CC_mean_intensity_ratio, color = cell_cycle_state)) +
+    geom_path(aes(y = Nuclei_CKn_NR_area_t0norm), color = "blueviolet") +
+    geom_path(aes(y = migration_distance), color = "brown", alpha = .5) +
+    geom_point(size = 1) +
+    labs(title = "Cell cycle measurements",
+         subtitle="purple: area\nbrown: migration") +
+    xlab("time") +
+    ylab("") +
+    facet_wrap(~label)
+  
+  pdf(paste0(data_path, plateID, "/Analysis/",pipeline_name,"/plots/",plateID,"_cell_cycle_plot.pdf"), height = 30,useDingbats = FALSE)
+  print(p_cell_cycle_states)
+  res <- dev.off()
+}
+res <- map(plateIDs, show_cell_cycle_plots)
 
