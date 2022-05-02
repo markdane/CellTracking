@@ -16,26 +16,25 @@ library(readxl)
 ```
 
 ```{r functions}
-get_l2_data <- function(plateID, data_path, pipeline_name = "PI"){
+get_l2_data <- function(plateID, data_path, pipeline_name = "CKn"){
   level_2_data_path <- paste0(data_path, plateID, "/Analysis/",pipeline_name,"/",plateID,"_level_2.csv")
+  
   l2 <- read_csv(level_2_data_path,
-                col_types = cols(.default = "c",
-                                    well = col_character(),
-                                    field = col_double(),
-                                    n_0 = col_double(),
-                                    elapsed_minutes = col_double(),
-                                    n = col_double(),
-                                    Drug1Concentration = col_character(),
-                                    Nuclei_PI_CC_mean_intensity = col_double(),
-                                    Cyto_PI_CC_mean_intensity = col_double(),
-                                    Cell_PI_CC_mean_intensity_ratio = col_double(),
-                                    Cell_PI_CC_max_intensity_ratio = col_double(),
-                                    Cell_PI_CC_min_intensity_ratio = col_double(),
-                                    cell_count_norm_T0 = col_double(),
-                                    G1_proportion = col_double()
-                   )) %>%
-    mutate(treatment = factor(treatment, levels = treatment_levels, ordered = TRUE),
-           plateID = plateID)
+                 col_types = cols(.default = "d",
+                                  plateID = col_character(),
+                                  well = col_character(),
+                                  time_slice = col_character(),
+                                  Drug1 = col_character(),
+                                  Drug1Concentration = col_character(),
+                                  Drug2 = col_character(),
+                                  Drug2Concentration = col_character(),
+                                  treatment = col_character(),
+                                  drugs = col_character()
+                   )) 
+  
+  # %>%
+  #   mutate(treatment = factor(treatment, levels = treatment_levels, ordered = TRUE),
+  #          plateID = plateID)
   return(l2)
 }
 
@@ -45,9 +44,8 @@ get_l2_data <- function(plateID, data_path, pipeline_name = "PI"){
 ```{r get_data}
 
 data_path <- "/home/exacloud/gscratch/HeiserLab/images/"
-pipeline_name <- "PI"
-plateIDs <- c("AU01501","AU01601","AU01701","AU01702","AU01801","AU01802","AU01901","AU01902","AU02001","AU02002","AU02101","AU02301","AU02401", "AU02501")
-#these plates need further processing , "AU02801","AU02901", "AU03001","AU03101"
+pipeline_name <- "CKn"
+plateIDs <- c("AU01701","AU01801","AU01802","AU01902","AU02001","AU02002","AU02301","AU02401", "AU02501", "AU02801", "AU03001", "AU03201", "AU03401", "AU03501", "AU03601", "AU03701")
 
 treatment_levels = c("vehicle",
                      "control",
@@ -107,13 +105,19 @@ cols <- c("BEZ235_1" = "cornflowerblue", "Cabozantinib_50" = "cornflowerblue", "
           "Everolimus_500" = "cadetblue", "Everolimus_1000" = "blue", "Everolimus_2500" = "blue3",
           "Everolimus_5000" = "darkblue")
 
-
-
-l2 <- map(plateIDs, get_l2_data, data_path = data_path) %>%
-  bind_rows() %>%
+l2 <- map_df(plateIDs[c(13, 14,16)], get_l2_data, data_path = data_path) %>%
   filter(!(plateID == "AU01801" & drugs %in% c("Bortezomib", "MK1775"))) %>%
-    mutate(elapsed_hours = elapsed_minutes/60)
+  mutate(elapsed_hours = elapsed_minutes/60)
 
+#dynamically assign consistent colors to the dosage concentrations
+treatments <-l2$treatment %>%
+  unique()  %>%
+  str_sort(numeric = TRUE)
+idx <- which(treatments == "Untreated") # Positions of Untreated in df$treatement
+treatments <- treatments[-idx]
+treatments_colors <-  rep(viridis(7, direction = -1), length.out = length(treatments))
+names(treatments_colors) <- treatments
+cols <- c("Untreated"="royalblue", treatments_colors)
 
 write_csv(l2, "../tables/AU565_round2and3_level2.csv")
 
