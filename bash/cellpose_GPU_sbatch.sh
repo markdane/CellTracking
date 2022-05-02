@@ -4,8 +4,8 @@
 #SBATCH --cpus-per-task 2
 #SBATCH --gres gpu:1
 #SBATCH --mem 40G
-#SBATCH --time 23:00:00
-#SBATCH --job-name 2001110
-#SBATCH --array=1-10
+#SBATCH --time 4:00:00
+#SBATCH --job-name AU01501
+#SBATCH --array=1-24
 
-python /home/exacloud/gscratch/HeiserLab/software/image_analysis_pipelines/AU565/python/Process_LCI_nuclear.py AU02001 $SLURM_ARRAY_TASK_ID
+python /home/exacloud/gscratch/HeiserLab/software/image_analysis_pipelines/AU565/python/Process_LCI_nuclear.py AU01501 $SLURM_ARRAY_TASK_ID

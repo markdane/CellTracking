@@ -1,5 +1,5 @@
 ---
-title: "AU565 drug combination responses"
+title: "Live cell imaging field-level results"
 output: 
   html_document:
   code_folding: hide
@@ -52,6 +52,7 @@ read_process_l1_data <- function(l1_data_path){
 read_process_l2_data <- function(l2_data_path){
   treatment_levels = c("vehicle",
                      "control",
+                     "untreated_0",
                      "Lapatinib_25", "Lapatinib_50", "Lapatinib_100", "Lapatinib_250",
                      
                      "Palbociclib_25", "Palbociclib_50", "Palbociclib_100",  "Palbociclib_250" ,
@@ -63,6 +64,10 @@ read_process_l2_data <- function(l2_data_path){
                      "Doxorubicin_20",
                      "Palbociclib_50_Doxorubicin_20",
                      "Lapatinib_100_Doxorubicin_20",
+                      "Doxorubicin_0.5" , "Doxorubicin_1", "Doxorubicin_10",
+          "Doxorubicin_25","Doxorubicin_50" , "Doxorubicin_125" ,"Doxorubicin_250",
+                    "Gemcitabine_0.25", "Gemcitabine_0.5", "Gemcitabine_1",
+          "Gemcitabine_1.5","Gemcitabine_2", "Gemcitabine_2.5","Gemcitabine_3",
                      "Paclitaxel_2",
                      "Paclitaxel_2_Lapatinib_100",
                      "Paclitaxel_2_Doxorubicin_20",
@@ -290,6 +295,8 @@ cols <- c("BEZ235_1" = "cornflowerblue", "Cabozantinib_50" = "cornflowerblue", "
           "AZD5438_5000" = "darkblue",
           "Bortezomib_1" = "cornflowerblue", "Bortezomib_2.5"= "darkcyan", "Bortezomib_5" = "cadetblue4",
           "Bortezomib_10" = "cadetblue","Bortezomib_20" = "blue", "Bortezomib_30" = "blue3","Bortezomib_50" = "darkblue",
+          "Doxorubicin_0.5" = "cornflowerblue", "Doxorubicin_1"= "darkcyan", "Doxorubicin_10" = "cadetblue4",
+          "Doxorubicin_25" = "cadetblue","Doxorubicin_50" = "blue", "Doxorubicin_125" = "blue3","Doxorubicin_250" = "darkblue",
           "Panobinostat.5"= "cornflowerblue", "Panobinostat_1"= "darkcyan", "Panobinostat_2.5" = "cadetblue4",
           "Panobinostat_5" = "cadetblue", "Panobinostat_6.5"  = "blue",  "Panobinostat_10" = "blue3",
           "Panobinostat_12.5" = "darkblue",
@@ -301,10 +308,11 @@ cols <- c("BEZ235_1" = "cornflowerblue", "Cabozantinib_50" = "cornflowerblue", "
           "MG132_20" = "blue", "MG132_30" = "blue3", "MG132_50" = "darkblue",
           "Everolimus_50" = "cornflowerblue", "Everolimus_100"= "darkcyan", "Everolimus_250" = "cadetblue4",
           "Everolimus_500" = "cadetblue", "Everolimus_1000" = "blue", "Everolimus_2500" = "blue3",
-          "Everolimus_5000" = "darkblue")
+          "Everolimus_5000" = "darkblue",
+          "Gemcitabine_0.25" = "cornflowerblue", "Gemcitabine_0.5"= "darkcyan", "Gemcitabine_1" = "cadetblue4",
+          "Gemcitabine_1.5" = "cadetblue","Gemcitabine_2"= "blue", "Gemcitabine_2.5" = "blue3","Gemcitabine_3" = "darkblue")
 
-
-  g1_threshold <- .96
+  g1_threshold <- .82
 
 #hack to deal with bortexomib_50 used once as a low dosage and another time as a high doasge
   if("Bortezomib_1" %in% l2$treatment){
@@ -676,20 +684,20 @@ process_plate<- function(plateID, ...){
 
   #process track files
   generate_plots(plateID, datasets$l1, datasets$l2)
-  generate_lineage_plots(plateID, datasets$l1, datasets$l2)
+  #generate_lineage_plots(plateID, datasets$l1, datasets$l2)
  #compare_to_CP(plateID, l2)
 }
 
 data_path <- "/home/exacloud/gscratch/HeiserLab/images/"
 #data_path <- "/Users/dane/Documents/CellTrackingProjects/AU565/images/"
 pipeline_name <- "CKn"
-plateID <- "AU02001"
+plateID <- "HC00701"
 
 
 
-datasets <- create_level_2_data(plateID, data_path = data_path)
+#datasets <- create_level_2_data(plateID, data_path = data_path)
 
-res <- map(c("AU02001"), process_plate, data_path = data_path)
+res <- map(c("HC00701"), process_plate, data_path = data_path)
 
 
   
