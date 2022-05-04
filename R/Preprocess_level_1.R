@@ -382,7 +382,7 @@ generate_lineage_plots <- function(plateID){
 
   p_lineages_paths <- ggplot(df_lineage_labels, aes(x = elapsed_minutes, y = lineage_label, group = factor(label), color = factor(lineage))) +
     geom_path() +
-    scale_color_manual(values=rep(viridis(8)),times=10)) +
+    scale_color_manual(values=rep(viridis(8)),times=10) +
     guides(color = "none") +
     theme_classic() +
     theme(axis.text.y = element_blank())
@@ -394,7 +394,7 @@ generate_lineage_plots <- function(plateID){
 
 data_path <-  "/home/exacloud/gscratch/HeiserLab/images/"
 pipeline_name <- "CKn"
-plateIDs <- c("AU03501" = "AU03501")
+plateIDs <- c("HC00701" = "HC00701")
 
 datasets <- map(plateIDs, read_plate_l1)
 res <- map(plateIDs, PCA_analysis)
@@ -413,6 +413,15 @@ res <- map(plateIDs, create_lineage_pdf, wll = "D6", fld = 2)
 
 show_cell_cycle_plots <- function(plateID){
   df <- datasets[[plateID]][["l1"]]
+  
+  #dynamically assign consistent colors to the dosage concentrations
+  treatments <-df$treatment%>%
+    unique()  %>%
+    str_sort(numeric = TRUE)
+  idx <- which(treatments == "Untreated") # Positions of Untreated in df$treatement
+  treatments <- treatments[-idx]
+  
+  df$treatment <- factor(df$treatment, levels = c(treatments, "Untreated"))
   
   set.seed(42)
   df_selected<- df %>%
@@ -453,6 +462,24 @@ show_cell_cycle_plots <- function(plateID){
   
   pdf(paste0(data_path, plateID, "/Analysis/",pipeline_name,"/plots/",plateID,"_cell_cycle_plot.pdf"), height = 30,useDingbats = FALSE)
   print(p_cell_cycle_states)
+  res <- dev.off()
+  
+  df_lineages <- df %>%
+    group_by(plateID, well, field, treatment,  label) %>%
+    summarise(lifetime = mean(length-1)*.5, 
+              .groups="drop")
+  
+  p_lineage_length <- ggplot(df_lineages, aes(x = factor(field), y = lifetime)) +
+      geom_violin(draw_quantiles = c(0.25, 0.5, 0.75)) +
+    xlab("field") +
+    ylab("cell lifetime (hours)") +
+    theme_bw()+
+    facet_wrap(~treatment, ncol = 7)
+  
+  p_lineage_length
+  
+  pdf(paste0(data_path, plateID, "/Analysis/",pipeline_name,"/plots/",plateID,"_lineage_length_plot.pdf"),useDingbats = FALSE)
+  print(p_lineage_length)
   res <- dev.off()
 }
 res <- map(plateIDs, show_cell_cycle_plots)
