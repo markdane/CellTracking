@@ -73,11 +73,11 @@ generate_l2_plots <- function(plateID){
   treatments <-df$treatment%>%
     unique()  %>%
     str_sort(numeric = TRUE)
-  idx <- which(treatments == "Untreated") # Positions of Untreated in df$treatement
+  idx <- which(treatments %in% c("control","vehicle","Untreated")) # Positions of Untreated in df$treatement
   treatments <- treatments[-idx]
   treatments_colors <-  rep(viridis(7, direction = -1), length.out = length(treatments))
   names(treatments_colors) <- treatments
-  cols <- c("Untreated"="royalblue", treatments_colors)
+  cols <- c("control"="royalblue","vehicle"="royalblue","Untreated"="royalblue", treatments_colors)
   
   p_n <- ggplot(df, aes(x = elapsed_minutes, y = n, color = factor(field))) +
     geom_path() +
@@ -238,7 +238,7 @@ generate_l2_plots <- function(plateID){
 ##########
 data_path <-  "/home/exacloud/gscratch/HeiserLab/images/"
 pipeline_name <- "CKn"
-plateIDs <- c("AU03501" = "AU03501")
+plateIDs <- c("AU00601" = "AU00601")
 
 datasets <- map(plateIDs, create_level_2_data, data_path = data_path)
 res <- map(plateIDs, generate_l2_plots)

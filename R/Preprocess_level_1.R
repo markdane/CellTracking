@@ -239,11 +239,11 @@ create_density_plots <- function(plateID){
   treatments <-df$treatment%>%
     unique()  %>%
     str_sort(numeric = TRUE)
-  idx <- which(treatments == "Untreated") # Positions of Untreated in df$treatement
+  idx <- which(treatments %in% c("control","vehicle","Untreated")) # Positions of Untreated in df$treatement
   treatments <- treatments[-idx]
   treatments_colors <-  rep(viridis(7, direction = -1), length.out = length(treatments))
   names(treatments_colors) <- treatments
-  cols <- c("Untreated"="royalblue", treatments_colors)
+  cols <- c("control"="royalblue","vehicle"="royalblue","Untreated"="royalblue", treatments_colors)
   
   #look at density plots of the cell cycle ratios per image
   #start with just the initial time point
@@ -275,6 +275,23 @@ create_density_plots <- function(plateID){
       geom_vline(xintercept = cell_cycle_state_threshold)
   }
   print(p_densities)
+  
+  df_untreated <- df %>%
+    filter(treatment %in% c("vehicle", "control", "Untreated"))
+  
+ p_untreated <- ggplot(df_untreated, aes(Cell_CKn_CC_mean_intensity_ratio, fill = treatment, color = treatment)) +
+    geom_density(alpha = .2)+
+    scale_color_manual(values = cols) +
+    scale_fill_manual(values = cols) +
+    guides(fill = "none", color = "none") +
+    theme_bw()
+ 
+ if("cell_cycle_state_threshold" %in% colnames(df_untreated)){
+   cell_cycle_state_threshold <- unique(df_untreated$cell_cycle_state_threshold)
+   p_untreated <- p_untreated +
+     geom_vline(xintercept = cell_cycle_state_threshold)
+ }
+ print(p_untreated)
   res <- dev.off()
 }
 
@@ -307,7 +324,7 @@ create_lineage_pdf <- function(plateID, wll, fld){
   
   p_lineages_state <- ggplot(df_lineage_labels, aes(x = elapsed_minutes, y = lineage_label, group = label, fill = lineage, color = cell_cycle_state)) +
     geom_point(size = 1, shape = 21, stroke = .1)+
-    scale_fill_manual(values=rep(brewer.pal(8,"Dark2"),times=400)) +
+    scale_fill_manual(values=rep(viridis(8),times=400)) +
     scale_color_manual(values = c("G1" = "transparent", "S/G2" = "black"))+
     guides(color = "none", fill = "none") +
     labs(title = paste("T0 lineages -",unique(df_lineage_labels$Drug1),"field",unique(df_lineage_labels$field)),
@@ -382,7 +399,7 @@ generate_lineage_plots <- function(plateID){
 
   p_lineages_paths <- ggplot(df_lineage_labels, aes(x = elapsed_minutes, y = lineage_label, group = factor(label), color = factor(lineage))) +
     geom_path() +
-    scale_color_manual(values=rep(brewer.pal(8,"Dark2"),times=10)) +
+    scale_color_manual(values=rep(viridis(8)),times=10) +
     guides(color = "none") +
     theme_classic() +
     theme(axis.text.y = element_blank())
@@ -390,11 +407,87 @@ generate_lineage_plots <- function(plateID){
 
 }
 
+
+show_cell_cycle_plots <- function(plateID){
+  df <- datasets[[plateID]][["l1"]]
+  
+  #dynamically assign consistent colors to the dosage concentrations
+  treatments <-df$treatment%>%
+    unique()  %>%
+    str_sort(numeric = TRUE)
+  idx <- which(treatments %in% c("control","vehicle","Untreated")) # Positions of Untreated in df$treatement
+  treatments <- treatments[-idx]
+  treatments_colors <-  rep(viridis(7, direction = -1), length.out = length(treatments))
+  names(treatments_colors) <- treatments
+  cols <- c("control"="royalblue","vehicle"="royalblue","Untreated"="royalblue", treatments_colors)
+  
+  df$treatment <- factor(df$treatment, levels = c(treatments, "control","vehicle","Untreated"))
+  
+  set.seed(42)
+  df_selected<- df %>%
+    #filter(well %in% c("A1", "A2")) %>%
+    filter(migration_distance  < 5,
+           length>10) %>%
+    mutate(field_label = paste0(field, "_", label)) %>%
+    group_by(plateID, well) %>%
+    filter(field_label %in% sample(unique(field_label), size = 5, replace = FALSE)) %>%
+    group_by(plateID, well, field, label) %>%
+    filter(elapsed_minutes == min(elapsed_minutes)) %>%
+    select(label,
+           elapsed_minutes,
+           Nuclei_CKn_NR_area,
+           cell_cycle_state) %>%
+    mutate(t0_Nuclei_CKn_NR_area = Nuclei_CKn_NR_area) %>%
+    select(plateID, well, field, label, t0_Nuclei_CKn_NR_area) %>%
+    left_join(df, by = c("plateID", "well", "field", "label"))  %>%
+    mutate(Nuclei_CKn_NR_area_t0norm = Nuclei_CKn_NR_area/t0_Nuclei_CKn_NR_area,
+           label = as.character(label)) %>%
+    arrange(well, field, label)
+  
+  p_cell_cycle_states <- ggplot(df_selected, aes(elapsed_minutes, Cell_CKn_CC_mean_intensity_ratio, color = cell_cycle_state)) +
+    geom_path(aes(y = Nuclei_CKn_NR_area_t0norm, group = label), color = "blueviolet") +
+    geom_path(aes(y = migration_distance, group = label), color = "brown", alpha = .5) +
+    geom_point(aes(group = label), size = .7) +
+    labs(title = "Cell cycle measurements",
+         subtitle="purple: area\nbrown: migration") +
+    xlab("time") +
+    ylab("") +
+    theme(axis.text.x = element_text(angle = 90)) +
+    coord_cartesian(ylim = c(0,5)) +
+    theme_bw() +
+    theme(strip.background = NULL,
+          strip.text = element_text(size = 6)) +
+    facet_wrap(vars(well, field, label), ncol = 5, labeller = label_wrap_gen(multi_line=FALSE))
+  p_cell_cycle_states
+  
+  pdf(paste0(data_path, plateID, "/Analysis/",pipeline_name,"/plots/",plateID,"_cell_cycle_plot.pdf"), height = 30,useDingbats = FALSE)
+  print(p_cell_cycle_states)
+  res <- dev.off()
+  
+  df_lineages <- df %>%
+    group_by(plateID, well, field, treatment,  label) %>%
+    summarise(lifetime = mean(length-1)*.5, 
+              .groups="drop")
+  
+  p_lineage_length <- ggplot(df_lineages, aes(x = factor(field), y = lifetime)) +
+      geom_violin(draw_quantiles = c(0.25, 0.5, 0.75)) +
+    xlab("field") +
+    ylab("cell lifetime (hours)") +
+    theme_bw()+
+    facet_wrap(~treatment, ncol = 7)
+  
+  p_lineage_length
+  
+  pdf(paste0(data_path, plateID, "/Analysis/",pipeline_name,"/plots/",plateID,"_lineage_length_plot.pdf"),useDingbats = FALSE)
+  print(p_lineage_length)
+  res <- dev.off()
+}
+
 ###########
 
 data_path <-  "/home/exacloud/gscratch/HeiserLab/images/"
 pipeline_name <- "CKn"
-plateIDs <- c("AU03501" = "AU03501")
+plateIDs <- c("AU00601" = "AU00601")
 
 datasets <- map(plateIDs, read_plate_l1)
 res <- map(plateIDs, PCA_analysis)
@@ -411,39 +504,5 @@ res <- map(plateIDs, create_lineage_pdf, wll = "B5", fld = 2)
 res <- map(plateIDs, create_lineage_pdf, wll = "C5", fld = 2)
 res <- map(plateIDs, create_lineage_pdf, wll = "D6", fld = 2)
 
-show_cell_cycle_plots <- function(plateID){
-  df <- datasets[[plateID]][["l1"]]
-  
-  set.seed(42)
-  df_selected<- df %>%
-    group_by(plateID, well, field) %>%
-    filter(label %in% sample(unique(label), size = 5, replace = FALSE)) %>%
-    group_by(plateID, well, field, label) %>%
-    filter(elapsed_minutes == min(elapsed_minutes)) %>%
-    select(label,
-           elapsed_minutes,
-           Nuclei_CKn_NR_area,
-           cell_cycle_state) %>%
-    mutate(t0_Nuclei_CKn_NR_area = Nuclei_CKn_NR_area) %>%
-    select(plateID, well, field, label, t0_Nuclei_CKn_NR_area) %>%
-    left_join(df, by = c("plateID", "well", "field", "label"))  %>%
-    filter(migration_distance  < 5,
-           length>10) %>%
-    mutate(Nuclei_CKn_NR_area_t0norm = Nuclei_CKn_NR_area/t0_Nuclei_CKn_NR_area)
-  
-  p_cell_cycle_states <- ggplot(df_selected, aes(elapsed_minutes, Cell_CKn_CC_mean_intensity_ratio, color = cell_cycle_state)) +
-    geom_path(aes(y = Nuclei_CKn_NR_area_t0norm), color = "blueviolet") +
-    geom_path(aes(y = migration_distance), color = "brown", alpha = .5) +
-    geom_point(size = 1) +
-    labs(title = "Cell cycle measurements",
-         subtitle="purple: area\nbrown: migration") +
-    xlab("time") +
-    ylab("") +
-    facet_wrap(~label)
-  
-  pdf(paste0(data_path, plateID, "/Analysis/",pipeline_name,"/plots/",plateID,"_cell_cycle_plot.pdf"), height = 30,useDingbats = FALSE)
-  print(p_cell_cycle_states)
-  res <- dev.off()
-}
 res <- map(plateIDs, show_cell_cycle_plots)
 
