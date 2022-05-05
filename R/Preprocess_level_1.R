@@ -286,7 +286,7 @@ create_density_plots <- function(plateID){
     guides(fill = "none", color = "none") +
     theme_bw()
  
- if("cell_cycle_state_threshold" %in% colnames(p_untreated)){
+ if("cell_cycle_state_threshold" %in% colnames(df_untreated)){
    cell_cycle_state_threshold <- unique(df_untreated$cell_cycle_state_threshold)
    p_untreated <- p_untreated +
      geom_vline(xintercept = cell_cycle_state_threshold)
