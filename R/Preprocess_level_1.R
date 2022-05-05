@@ -239,11 +239,11 @@ create_density_plots <- function(plateID){
   treatments <-df$treatment%>%
     unique()  %>%
     str_sort(numeric = TRUE)
-  idx <- which(treatments == "Untreated") # Positions of Untreated in df$treatement
+  idx <- which(treatments %in% c("control","vehicle","Untreated")) # Positions of Untreated in df$treatement
   treatments <- treatments[-idx]
   treatments_colors <-  rep(viridis(7, direction = -1), length.out = length(treatments))
   names(treatments_colors) <- treatments
-  cols <- c("Untreated"="royalblue", treatments_colors)
+  cols <- c("control"="royalblue","vehicle"="royalblue","Untreated"="royalblue", treatments_colors)
   
   #look at density plots of the cell cycle ratios per image
   #start with just the initial time point
@@ -275,6 +275,23 @@ create_density_plots <- function(plateID){
       geom_vline(xintercept = cell_cycle_state_threshold)
   }
   print(p_densities)
+  
+  df_untreated <- df %>%
+    filter(treatment %in% c("vehicle", "control", "Untreated"))
+  
+ p_untreated <- ggplot(df_untreated, aes(Cell_CKn_CC_mean_intensity_ratio, fill = treatment, color = treatment)) +
+    geom_density(alpha = .2)+
+    scale_color_manual(values = cols) +
+    scale_fill_manual(values = cols) +
+    guides(fill = "none", color = "none") +
+    theme_bw()
+ 
+ if("cell_cycle_state_threshold" %in% colnames(p_untreated)){
+   cell_cycle_state_threshold <- unique(df_untreated$cell_cycle_state_threshold)
+   p_untreated <- p_untreated +
+     geom_vline(xintercept = cell_cycle_state_threshold)
+ }
+ print(p_untreated)
   res <- dev.off()
 }
 
@@ -390,26 +407,6 @@ generate_lineage_plots <- function(plateID){
 
 }
 
-###########
-
-data_path <-  "/home/exacloud/gscratch/HeiserLab/images/"
-pipeline_name <- "CKn"
-plateIDs <- c("HC00701" = "HC00701")
-
-datasets <- map(plateIDs, read_plate_l1)
-res <- map(plateIDs, PCA_analysis)
-res <- map(plateIDs, create_density_plots)
-
-res <- map(plateIDs, create_lineage_pdf, wll = "A1", fld = 2)
-res <- map(plateIDs, create_lineage_pdf, wll = "B1", fld = 2)
-res <- map(plateIDs, create_lineage_pdf, wll = "C1", fld = 2)
-res <- map(plateIDs, create_lineage_pdf, wll = "D2", fld = 2)
-res <- map(plateIDs, create_lineage_pdf, wll = "B3", fld = 2)
-res <- map(plateIDs, create_lineage_pdf, wll = "C3", fld = 2)
-res <- map(plateIDs, create_lineage_pdf, wll = "D4", fld = 2)
-res <- map(plateIDs, create_lineage_pdf, wll = "B5", fld = 2)
-res <- map(plateIDs, create_lineage_pdf, wll = "C5", fld = 2)
-res <- map(plateIDs, create_lineage_pdf, wll = "D6", fld = 2)
 
 show_cell_cycle_plots <- function(plateID){
   df <- datasets[[plateID]][["l1"]]
@@ -418,10 +415,13 @@ show_cell_cycle_plots <- function(plateID){
   treatments <-df$treatment%>%
     unique()  %>%
     str_sort(numeric = TRUE)
-  idx <- which(treatments == "Untreated") # Positions of Untreated in df$treatement
+  idx <- which(treatments %in% c("control","vehicle","Untreated")) # Positions of Untreated in df$treatement
   treatments <- treatments[-idx]
+  treatments_colors <-  rep(viridis(7, direction = -1), length.out = length(treatments))
+  names(treatments_colors) <- treatments
+  cols <- c("control"="royalblue","vehicle"="royalblue","Untreated"="royalblue", treatments_colors)
   
-  df$treatment <- factor(df$treatment, levels = c(treatments, "Untreated"))
+  df$treatment <- factor(df$treatment, levels = c(treatments, "control","vehicle","Untreated"))
   
   set.seed(42)
   df_selected<- df %>%
@@ -482,5 +482,27 @@ show_cell_cycle_plots <- function(plateID){
   print(p_lineage_length)
   res <- dev.off()
 }
+
+###########
+
+data_path <-  "/home/exacloud/gscratch/HeiserLab/images/"
+pipeline_name <- "CKn"
+plateIDs <- c("AU00601" = "AU00601")
+
+datasets <- map(plateIDs, read_plate_l1)
+res <- map(plateIDs, PCA_analysis)
+res <- map(plateIDs, create_density_plots)
+
+res <- map(plateIDs, create_lineage_pdf, wll = "A1", fld = 2)
+res <- map(plateIDs, create_lineage_pdf, wll = "B1", fld = 2)
+res <- map(plateIDs, create_lineage_pdf, wll = "C1", fld = 2)
+res <- map(plateIDs, create_lineage_pdf, wll = "D2", fld = 2)
+res <- map(plateIDs, create_lineage_pdf, wll = "B3", fld = 2)
+res <- map(plateIDs, create_lineage_pdf, wll = "C3", fld = 2)
+res <- map(plateIDs, create_lineage_pdf, wll = "D4", fld = 2)
+res <- map(plateIDs, create_lineage_pdf, wll = "B5", fld = 2)
+res <- map(plateIDs, create_lineage_pdf, wll = "C5", fld = 2)
+res <- map(plateIDs, create_lineage_pdf, wll = "D6", fld = 2)
+
 res <- map(plateIDs, show_cell_cycle_plots)
 
