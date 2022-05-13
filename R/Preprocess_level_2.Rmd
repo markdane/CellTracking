@@ -19,7 +19,9 @@ library(readxl)
 get_QA_data <- function(plateID){
   filename <- paste0(data_path, plateID,"/Analysis/",pipeline_name,"/",plateID,"_QA_evaluation.csv")
   if(file.exists(filename)){
-    df <- read_csv(filename) %>%
+    df <- read_csv(filename,
+                   col_types = cols(
+                     plateID = col_character())) %>%
       select(plateID, well, field)
   } else{
     return(NULL)
@@ -238,7 +240,7 @@ generate_l2_plots <- function(plateID){
 ##########
 data_path <-  "/home/exacloud/gscratch/HeiserLab/images/"
 pipeline_name <- "CKn"
-plateIDs <- c("AU00601" = "AU00601")
+plateIDs <- c("HC00801" = "HC00801")
 
 datasets <- map(plateIDs, create_level_2_data, data_path = data_path)
 res <- map(plateIDs, generate_l2_plots)
