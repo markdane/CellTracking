@@ -32,6 +32,7 @@ process_tracks_file <- function(tracks_filename){
   
   tracks <- read_csv(tracks_filename,
                      col_types = cols(
+                       plateID = col_character(),
                        label = col_double(),
                        begins = col_double(),
                        ends = col_double(),
@@ -487,7 +488,7 @@ show_cell_cycle_plots <- function(plateID){
 
 data_path <-  "/home/exacloud/gscratch/HeiserLab/images/"
 pipeline_name <- "CKn"
-plateIDs <- c("AU00601" = "AU00601")
+plateIDs <- c("HC00801" = "HC00801")
 
 datasets <- map(plateIDs, read_plate_l1)
 res <- map(plateIDs, PCA_analysis)
