@@ -277,6 +277,17 @@ create_density_plots <- function(plateID){
   }
   print(p_densities)
   
+  p_mean_cyto_densities <- ggplot(df_select, aes(Cyto_CKn_CC_mean_intensity, fill = treatment, color = treatment)) +
+    geom_density(alpha = .2)+
+    geom_vline(xintercept = 175)+
+    scale_color_manual(values = cols) +
+    scale_fill_manual(values = cols) +
+    facet_grid(elapsed_hours~drugs) +
+    guides(fill = "none", color = "none") +
+    theme_bw()
+  
+  print(p_mean_cyto_densities)
+  
   df_untreated <- df %>%
     filter(treatment %in% c("vehicle", "control", "Untreated"))
   
@@ -488,7 +499,7 @@ show_cell_cycle_plots <- function(plateID){
 
 data_path <-  "/home/exacloud/gscratch/HeiserLab/images/"
 pipeline_name <- "CKn"
-plateIDs <- c("HC00801" = "HC00801")
+plateIDs <- c("2100601" = "2100601")
 
 datasets <- map(plateIDs, read_plate_l1)
 res <- map(plateIDs, PCA_analysis)
