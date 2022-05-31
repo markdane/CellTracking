@@ -47,12 +47,14 @@ create_level_2_data <- function(plateID, data_path = "/home/exacloud/gscratch/He
     mutate(drugs =  paste(Drug1 ,Drug2, sep = "_"),
            drugs = str_remove_all(drugs, "_none|_0$"),
            treatment = str_remove_all(treatment, "_none"),
-           treatment = str_remove_all(treatment, "_0$")) 
+           treatment = str_remove_all(treatment, "_0$"),
+           hours = elapsed_minutes/60) 
   # %>%
   #   filter(!elapsed_minutes %in% c(0, 30, 60, 90, 120, 150, 180, 210, 240)) 
   
-  #normalize to earliest time point2
-  earliest_time_points <- sort(unique(l2$elapsed_minutes))[1:3]
+  #normalize to earliest time points
+  
+  earliest_time_points <- sort(unique(l2$elapsed_minutes))[1:1]
     # earliest_time_point <- unique(l2$elapsed_minutes) %>%
     #   min()
     
@@ -83,7 +85,9 @@ create_level_2_data <- function(plateID, data_path = "/home/exacloud/gscratch/He
 generate_l2_plots <- function(plateID){
   l2_data_path <- paste0(data_path,plateID,"/Analysis/",pipeline_name,"/",plateID,"_level_2.csv")
   
-  df <- datasets[[plateID]]
+  df <- datasets[[plateID]] %>%
+    mutate(field = as.factor(field)) %>% 
+    arrange(elapsed_minutes)
   
     #dynamically assign consistent colors to the dosage concentrations
   treatments <-df$treatment%>%
@@ -95,52 +99,55 @@ generate_l2_plots <- function(plateID){
   names(treatments_colors) <- treatments
   cols <- c("control"="royalblue","vehicle"="royalblue","Untreated"="royalblue", treatments_colors)
   
-  p_n <- ggplot(df, aes(x = elapsed_minutes, y = n, color = factor(field))) +
+  p_n <- ggplot(df, aes(x = hours, y = n, color = field, group = field)) +
     geom_path() +
     stat_summary(fun=mean, aes(group=1), geom="line", colour="blue") +
     scale_y_continuous(trans = 'log2')+
+    scale_x_continuous(breaks = c(0,24,48,72,96)) +
     labs(title = "Cell counts in each field",
          subtitle = "organized by position in the plate") +
-    xlab("minutes") +
+    xlab("hours") +
     ylab("cell count (log2 spacing)") +
     facet_wrap(~well, ncol = 6)
   p_n
   
-  p_n_T0 <- ggplot(df, aes(x = elapsed_minutes, y = cell_count_norm_T0, color = factor(field))) +
+  p_n_T0 <- ggplot(df, aes(x = hours, y = cell_count_norm_T0, color = factor(field))) +
     geom_path() +
     stat_summary(fun=mean, aes(group=1), geom="line", colour="blue") +
+        scale_x_continuous(breaks = c(0,24,48,72,96)) +
     scale_y_continuous(trans = 'log2') +
     labs(title = "Cell counts in each field (T0 normed)",
          subtitle = "organized by position in the plate") +
-         xlab("minutes") +
+         xlab("hours") +
          ylab("cell count (log2 spacing)") +
     facet_wrap(~well, ncol = 6)
   p_n_T0
   
-  p_CC <- ggplot(df, aes(x = elapsed_minutes, y = Nuclei_CKn_CC_mean_intensity, color = factor(field))) +
-    geom_path() +
-    stat_summary(fun=mean, aes(group=1), geom="line", colour="blue") +
-    labs(title = "Cell cycle intensity in the nuclei, mean") +
-         xlab("minutes") +
-         ylab("intensity") +
-    facet_wrap(~well, ncol = 6)
-  p_CC
-  
+  # p_CC <- ggplot(df, aes(x = elapsed_minutes, y = Nuclei_CKn_CC_mean_intensity, color = factor(field))) +
+  #   geom_path() +
+  #   stat_summary(fun=mean, aes(group=1), geom="line", colour="blue") +
+  #   labs(title = "Cell cycle intensity in the nuclei, mean") +
+  #        xlab("minutes") +
+  #        ylab("intensity") +
+  #   facet_wrap(~well, ncol = 6)
+  # p_CC
+  # 
 
-  p_cyto_CC <- ggplot(df, aes(x = elapsed_minutes, y = Cyto_CKn_CC_mean_intensity, color = factor(field))) +
-    geom_path() +
-    stat_summary(fun=mean, aes(group=1), geom="line", colour="blue") +
-    labs(title = "Cell cycle intensity in the cytoplasm, mean") +
-         xlab("minutes") +
-         ylab("intensity") +
-    facet_wrap(~well, ncol = 6)
-  p_cyto_CC
+  # p_cyto_CC <- ggplot(df, aes(x = elapsed_minutes, y = Cyto_CKn_CC_mean_intensity, color = factor(field))) +
+  #   geom_path() +
+  #   stat_summary(fun=mean, aes(group=1), geom="line", colour="blue") +
+  #   labs(title = "Cell cycle intensity in the cytoplasm, mean") +
+  #        xlab("minutes") +
+  #        ylab("intensity") +
+  #   facet_wrap(~well, ncol = 6)
+  # p_cyto_CC
   
-  p_cyto_CC_ratio <- ggplot(df, aes(x = elapsed_minutes, y = Cell_CKn_CC_mean_intensity_ratio, color = factor(field))) +
+  p_cyto_CC_ratio <- ggplot(df, aes(x = hours, y = Cell_CKn_CC_mean_intensity_ratio, color = factor(field))) +
     geom_path() +
     stat_summary(fun=mean, aes(group=1), geom="line", colour="blue") +
+        scale_x_continuous(breaks = c(0,24,48,72,96)) +
     labs(title = "Cell cycle intensity in the cytoplasm/nuclei, mean") +
-         xlab("minutes") +
+         xlab("hours") +
          ylab("intensity") +
     facet_wrap(~well, ncol = 2)
   p_cyto_CC_ratio
@@ -162,38 +169,43 @@ generate_l2_plots <- function(plateID){
               n = mean(n),
               G1_proportion = mean(G1_proportion), .groups = "drop") %>%
     left_join(df_control_mean, by = "elapsed_minutes")%>%
-    mutate(elapsed_hours = as.integer(elapsed_minutes)/60,
-           elapsed_hours = as.character(elapsed_hours),
-           elapsed_hours = fct_inseq(elapsed_hours,ordered = TRUE),
+    mutate(hours = as.integer(elapsed_minutes)/60,
+           hours = as.character(hours),
+           hours = fct_inseq(hours, ordered = TRUE),
            cell_count_norm_control = n/n_control)
   
   df_mean_select <- df_mean %>%
-    filter(elapsed_hours %in% c(0, 24, 48, 72, 96)) %>%
+    filter(hours %in% c(0, 24, 48, 72, 96)) %>%
     arrange(drugs, Drug1ConcentrationRank)
-    
   
-  p_n_t_T0_mean <- ggplot(df_mean, aes(x = elapsed_minutes, y = cell_count_norm_T0, color = treatment, group = Drug1Concentration)) +
+  drug1_concentration_ranks <- unique(df_mean_select$Drug1ConcentrationRank)
+  rank_colors <-  rep(viridis(7, direction = -1), length.out = length(drug1_concentration_ranks))
+  
+  
+  p_n_t_T0_mean <- ggplot(df_mean, aes(x = hours, y = cell_count_norm_T0, color = treatment, group = Drug1Concentration)) +
     geom_path() +
     geom_path(aes(y = cell_count_norm_T0_control), color = "firebrick4")+
+    scale_x_discrete(breaks = c(0,24,48,72,96)) +
     scale_y_continuous(trans = 'log2') +
     scale_color_manual(values = cols) +
     labs(title = "Cell counts for each treatment (T0 normed)",
          subtitle = "organized by treatment and dosage") +
-         xlab("minutes") +
-         ylab("cell count (log2 spacing)") +
+    xlab("hours") +
+    ylab("cell count (log2 spacing)") +
     guides(color = "none") +
     facet_wrap(~drugs, ncol = 6)+
     theme(strip.text = element_text(size = 5)) +
     theme_bw()
   p_n_t_T0_mean
   
-  p_G1_t_mean <- ggplot(df_mean, aes(x = elapsed_minutes, y = G1_proportion, color = treatment, group = Drug1Concentration)) +
+  p_G1_t_mean <- ggplot(df_mean, aes(x = hours, y = G1_proportion, color = treatment, group = Drug1Concentration)) +
     geom_path() +
-        geom_path(aes(y = G1_proportion_control), color = "firebrick4")+
+    geom_path(aes(y = G1_proportion_control), color = "firebrick4")+
+    scale_x_discrete(breaks = c(0,24,48,72,96)) +
     scale_color_manual(values = cols) +
     labs(title = "G1 proportion for each treatment",
          subtitle = "organized by treatment and dosage") +
-         xlab("minutes") +
+         xlab("hours") +
          ylab("G1 proportion") +
     guides(color = "none") +
     facet_wrap(~drugs, ncol = 6)+
@@ -201,20 +213,21 @@ generate_l2_plots <- function(plateID){
     theme_bw()
   p_G1_t_mean
   
-  p_cell_count_dose_response <- ggplot(df_mean_select, aes(x = Drug1ConcentrationRank, y = cell_count_norm_control, color = elapsed_hours, group = elapsed_hours)) +
+  p_cell_count_dose_response <- ggplot(df_mean_select, aes(x = Drug1ConcentrationRank, y = cell_count_norm_control, color = hours, group = hours)) +
     geom_path() +
+    scale_color_manual(values = rank_colors) +
     labs(title = "Dose response curves for cell count") +
     xlab("Drug concentration") +
     ylab("Cell count (normalized to control)") +   
     guides(color = guide_legend("Hours")) +
     theme_bw()+
-    theme(axis.text.x = element_text(angle = 90))+
     facet_wrap(~factor(drugs), ncol = 4)
   p_cell_count_dose_response
   
   #replace drug rank with concentration
-    p_cell_count_dose_response_conc <- ggplot(df_mean_select, aes(x = Drug1Concentration, y = cell_count_norm_control, color = elapsed_hours, group = elapsed_hours)) +
+  p_cell_count_dose_response_conc <- ggplot(df_mean_select, aes(x = Drug1Concentration, y = cell_count_norm_control, color = hours, group = hours)) +
     geom_path() +
+    scale_color_manual(values = rank_colors) +
     labs(title = "Dose response curves for cell count") +
     xlab("Drug concentration") +
     ylab("Cell count (normalized to control)") +   
@@ -231,8 +244,6 @@ generate_l2_plots <- function(plateID){
   print(p_n)
   print(p_n_T0)
   print(p_cyto_CC_ratio)
-  print(p_CC)
-  print(p_cyto_CC)
   res <- dev.off()
   
   pdf(paste0(plot_path, plateID,"_summary.pdf"), width = 10, height = 7)
@@ -267,6 +278,7 @@ pipeline_name <- "CKn"
 plateIDs <- c("2100601" = "2100601")
 plateIDs <- c("HC00701" = "HC00701","HC00801" = "HC00801","HC00901" = "HC00901","HC01001" = "HC01001","HC01301" = "HC01301","HC01401" = "HC01401")
 plateIDs <- c("HC00801" = "HC00801","HC01001" = "HC01001","HC01401" = "HC01401")
+plateIDs <- c("HC01401" = "HC01401")
 
 datasets <- map(plateIDs, create_level_2_data, data_path = data_path)
 res <- map(plateIDs, generate_l2_plots)
