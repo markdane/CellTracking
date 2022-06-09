@@ -50,7 +50,7 @@ generate_summary_plots <- function(df){
            cell_count_norm_control = n/n_control)
   
   df_mean_select <- df_mean %>%
-    filter(hours %in% c(5, 24, 48, 72, 96)) %>%
+    filter(hours %in% c(0, 24, 48, 72, 96)) %>%
     arrange(drugs, Drug1ConcentrationRank)
 
 
@@ -111,10 +111,24 @@ p_cell_count_dose_response <- ggplot(df_mean_select_0, aes(x = Drug1Concentratio
     facet_wrap(~factor(drugs), ncol = 6)
   p_cell_count_dose_response
   
-  pdf(paste0(data_path,"HCC1143_summary.pdf"), width = 10, height = 4)
+  p_cell_count_dose_response_conc <- ggplot(df_mean_select_0, aes(x = Drug1Concentration, y = cell_count_norm_control, color = hours, group = hours)) +
+    geom_path() +
+    labs(title = "Dose response curves for cell count",
+         subtitle = "normalized to control") +
+    xlab("Drug concentration") +
+    ylab("Cell count") +   
+    guides(color = guide_legend("Hours")) +
+      scale_color_manual(values = drug_cols) +
+    theme_bw()+
+    theme(axis.text.x = element_text(size = 6)) +
+    facet_wrap(~factor(drugs), ncol = 6, scale = "free_x")
+  p_cell_count_dose_response_conc
+  
+  pdf(paste0(data_path,"HCC1143_summary_",pipeline_name,".pdf"), width = 10, height = 4)
   print(p_n_t_T0_mean)
   print(p_G1_t_mean)
   print(p_cell_count_dose_response)
+  print(p_cell_count_dose_response_conc)
   res <- dev.off()
 }
 
@@ -124,13 +138,13 @@ p_cell_count_dose_response <- ggplot(df_mean_select_0, aes(x = Drug1Concentratio
 
 ```{r visualize_data}
 
-get_level_2_data <- function(plateID, data_path = "/home/exacloud/gscratch/HeiserLab/images/", pipeline_name = "CKn"){
+get_level_2_data <- function(plateID, data_path = "/home/exacloud/gscratch/HeiserLab/images/", pipeline_name = "CtnK"){
   df <- read_csv(paste0(data_path, plateID,"/Analysis/",pipeline_name,"/",plateID,"_level_2.csv"), show_col_types = FALSE)
 }
  
 ##########
 data_path <-  "/home/exacloud/gscratch/HeiserLab/images/"
-pipeline_name <- "CKn"
+pipeline_name <- "CtnK"
 plateIDs <- c("HC00701" = "HC00701","HC00801" = "HC00801","HC00901" = "HC00901","HC01001" = "HC01001","HC01301" = "HC01301","HC01401" = "HC01401")
 
 hcc1143_l2 <- map_df(plateIDs, get_level_2_data, data_path = data_path) %>%
