@@ -29,7 +29,7 @@ get_QA_data <- function(plateID){
   return(df)
 }
 
-create_level_2_data <- function(plateID, data_path = "/home/exacloud/gscratch/HeiserLab/images/", pipeline_name = "CKn"){
+create_level_2_data <- function(plateID, data_path = "/home/exacloud/gscratch/HeiserLab/images/", pipeline_name = "CKtnK"){
   l2_data_path <- paste0(data_path,plateID,"/Analysis/",pipeline_name,"/",plateID,"_level_2.csv")
 
   print(paste("creating new level 2 file for",plateID))
@@ -54,7 +54,7 @@ create_level_2_data <- function(plateID, data_path = "/home/exacloud/gscratch/He
   
   #normalize to earliest time points
   
-  earliest_time_points <- sort(unique(l2$elapsed_minutes))[1:1]
+  earliest_time_points <- sort(unique(l2$elapsed_minutes))[1:2]
     # earliest_time_point <- unique(l2$elapsed_minutes) %>%
     #   min()
     
@@ -123,7 +123,7 @@ generate_l2_plots <- function(plateID){
     facet_wrap(~well, ncol = 6)
   p_n_T0
   
-  # p_CC <- ggplot(df, aes(x = elapsed_minutes, y = Nuclei_CKn_CC_mean_intensity, color = factor(field))) +
+  # p_CC <- ggplot(df, aes(x = elapsed_minutes, y = Nuclei_CtnK_CC_mean_intensity, color = factor(field))) +
   #   geom_path() +
   #   stat_summary(fun=mean, aes(group=1), geom="line", colour="blue") +
   #   labs(title = "Cell cycle intensity in the nuclei, mean") +
@@ -133,7 +133,7 @@ generate_l2_plots <- function(plateID){
   # p_CC
   # 
 
-  # p_cyto_CC <- ggplot(df, aes(x = elapsed_minutes, y = Cyto_CKn_CC_mean_intensity, color = factor(field))) +
+  # p_cyto_CC <- ggplot(df, aes(x = elapsed_minutes, y = Cyto_CtnK_CC_mean_intensity, color = factor(field))) +
   #   geom_path() +
   #   stat_summary(fun=mean, aes(group=1), geom="line", colour="blue") +
   #   labs(title = "Cell cycle intensity in the cytoplasm, mean") +
@@ -142,7 +142,7 @@ generate_l2_plots <- function(plateID){
   #   facet_wrap(~well, ncol = 6)
   # p_cyto_CC
   
-  p_cyto_CC_ratio <- ggplot(df, aes(x = hours, y = Cell_CKn_CC_mean_intensity_ratio, color = factor(field))) +
+  p_cyto_CC_ratio <- ggplot(df, aes(x = hours, y = Cell_CtnK_CC_mean_intensity_ratio, color = factor(field))) +
     geom_path() +
     stat_summary(fun=mean, aes(group=1), geom="line", colour="blue") +
         scale_x_continuous(breaks = c(0,24,48,72,96)) +
@@ -274,13 +274,13 @@ generate_l2_plots <- function(plateID){
  
 ##########
 data_path <-  "/home/exacloud/gscratch/HeiserLab/images/"
-pipeline_name <- "CKn"
+pipeline_name <- "CtnK"
 plateIDs <- c("2100601" = "2100601")
 plateIDs <- c("HC00701" = "HC00701","HC00801" = "HC00801","HC00901" = "HC00901","HC01001" = "HC01001","HC01301" = "HC01301","HC01401" = "HC01401")
-plateIDs <- c("HC00801" = "HC00801","HC01001" = "HC01001","HC01401" = "HC01401")
-plateIDs <- c("HC01401" = "HC01401")
+#plateIDs <- c("HC00801" = "HC00801","HC01001" = "HC01001","HC01401" = "HC01401")
+#plateIDs <- c("HC01401" = "HC01401")
 
-datasets <- map(plateIDs, create_level_2_data, data_path = data_path)
+datasets <- map(plateIDs, create_level_2_data, data_path = data_path, pipeline_name = "CtnK")
 res <- map(plateIDs, generate_l2_plots)
 
 ```
