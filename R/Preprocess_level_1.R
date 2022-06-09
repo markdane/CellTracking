@@ -103,7 +103,7 @@ read_plate_l1 <- function(plateID){
            drugs = str_remove_all(drugs, "_none|_0"),
            treatment =  paste(Drug1, Drug1Concentration,Drug2, Drug2Concentration, sep = "_"),
            treatment = str_remove_all(treatment, "_none|_0")) %>%
-    filter(!elapsed_minutes %in% c(0, 30, 60, 90, 120, 150, 180, 210, 240)) %>%
+#    filter(!elapsed_minutes %in% c(0, 30, 60, 90, 120, 150, 180, 210, 240)) %>%
     select(-matches("Ligand*|ECMp*|Endpoint*|*media")) %>%
     drop_na() %>%
     group_by(plateID, well, field, label) %>%
@@ -360,7 +360,7 @@ generate_lineage_plots <- function(plateID){
 
   df <- datasets[[plateID]][["l1"]]
 
-  t0 <- unique(df$elapsed_minutes) %>% min()
+  t0psed <- unique(df$elapsed_minutes) %>% min()
 
   t0_lineages <- df %>%
     filter(elapsed_minutes == t0) %>%
@@ -499,22 +499,17 @@ show_cell_cycle_plots <- function(plateID){
 
 data_path <-  "/home/exacloud/gscratch/HeiserLab/images/"
 pipeline_name <- "CKn"
-plateIDs <- c("2100601" = "2100601")
+plateIDs <- c("HC00701" = "HC00701","HC00801" = "HC00801","HC00901" = "HC00901","HC01001" = "HC01001","HC01301" = "HC01301")
+plateIDs <- c("HC00801" = "HC00801","HC01001" = "HC01001","HC01401" = "HC01401")
 
 datasets <- map(plateIDs, read_plate_l1)
 res <- map(plateIDs, PCA_analysis)
 res <- map(plateIDs, create_density_plots)
 
-res <- map(plateIDs, create_lineage_pdf, wll = "A1", fld = 2)
-res <- map(plateIDs, create_lineage_pdf, wll = "B1", fld = 2)
-res <- map(plateIDs, create_lineage_pdf, wll = "C1", fld = 2)
-res <- map(plateIDs, create_lineage_pdf, wll = "D2", fld = 2)
-res <- map(plateIDs, create_lineage_pdf, wll = "B3", fld = 2)
-res <- map(plateIDs, create_lineage_pdf, wll = "C3", fld = 2)
-res <- map(plateIDs, create_lineage_pdf, wll = "D4", fld = 2)
-res <- map(plateIDs, create_lineage_pdf, wll = "B5", fld = 2)
-res <- map(plateIDs, create_lineage_pdf, wll = "C5", fld = 2)
-res <- map(plateIDs, create_lineage_pdf, wll = "D6", fld = 2)
+res <- map(plateIDs, create_lineage_pdf, wll = "A1", fld = 1)
+res <- map(plateIDs, create_lineage_pdf, wll = "D2", fld = 1)
+res <- map(plateIDs, create_lineage_pdf, wll = "D4", fld = 1)
+res <- map(plateIDs, create_lineage_pdf, wll = "D6", fld = 1)
 
 res <- map(plateIDs, show_cell_cycle_plots)
 
