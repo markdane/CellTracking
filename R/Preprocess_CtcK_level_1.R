@@ -144,16 +144,20 @@ read_plate_l1 <- function(plateID){
       ungroup()
     
     #add cell cycle state calls to each cell
-    # browser()
-    # untreated_ratios <- l1_data %>%
-    #   filter(treatment == "Untreated") %>% 
-    #   pull(Cell_CC_mean_intensity_ratio)
-    # 
-    # #use kmeans clustering on the Untreated cells to define a threshold for gating all cells
-    # cls <- kmeans(untreated_ratios, centers = c(quantile(untreated_ratios,.25), quantile(untreated_ratios,.75)))$cluster #force lower ratio to be in cluster 1
-    # cell_cycle_state_threshold <- max(untreated_ratios[cls == 1]) #threshold is the boundry between clusters
-    ######Notice threshold set to 1
-    cell_cycle_state_threshold <- 1
+    untreated_ratios <- l1_data %>%
+      filter(treatment == "Untreated") %>%
+      pull(Cell_CC_mean_intensity_ratio)
+
+    #use kmeans clustering on the Untreated cells to define a threshold for gating all cells
+   #cls <- kmeans(untreated_ratios, centers = c(quantile(untreated_ratios,.1), quantile(untreated_ratios,.9)))$cluster #force lower ratio to be in cluster 1
+   # cell_cycle_state_threshold <- max(untreated_ratios[cls == 1]) #threshold is the boundry between clusters
+    #####Notice threshold set to 1
+    #######cell_cycle_state_threshold <- 1
+    ########
+    #aternative method
+    d <- density(untreated_ratios)
+    cell_cycle_state_threshold <- optimize(approxfun(d$x,d$y),interval=quantile(untreated_ratios,c(.1, .9)))$minimum
+    
     l1_data$cell_cycle_state_threshold <- cell_cycle_state_threshold
     l1_data$cell_cycle_state <- "G1"
     l1_data$cell_cycle_state[l1_data$Cell_CC_mean_intensity_ratio>cell_cycle_state_threshold] <- "S/G2"
@@ -217,96 +221,9 @@ read_plate_l1 <- function(plateID){
 }
 
 
-PCA_analysis <- function(plateID){
-  l1_data_path <- paste0(data_path,plateID,"/Analysis/",pipeline_name,"/",plateID,"_level_1.csv")
-  
-  df <- datasets[[plateID]][["l1_subset"]]
-  
-  pca_obj <- df %>%
-    select(matches("_CC_"), matches("neighborhood"), any_of(c("begins", "ends", "length"))) %>%
-    select(-contains("centroid")) %>%
-    princomp()
-  
-  df_pca_scores <- as_tibble(pca_obj$scores) %>%
-    rename_with(~gsub("Comp.", "PC", .x, fixed = TRUE)) %>%
-    select(num_range("PC", 1:10))
-  
-  df_pca <- bind_cols(df, df_pca_scores)
-  
-  scree <- screeplot(pca_obj)
-  
-  df_pca_subset <- df_pca %>%
-    group_by(plateID, well) %>%
-    slice_sample(prop = .2) %>%
-    ungroup()
-  
-  plots_path <- paste0(data_path, plateID, "/Analysis/",pipeline_name,"/plots/")
-  if(!dir.exists(plots_path)) dir.create(plots_path)
-  
-  pdf(paste0(data_path, plateID, "/Analysis/",pipeline_name,"/plots/",plateID,"_PCA_plots.pdf"),useDingbats = FALSE)
-  
-  print(screeplot(pca_obj))
-  
-  p <- ggplot(df_pca_subset, aes(PC1, PC2, color = drugs)) +
-    geom_point(size = .5, alpha = .3) +
-    #coord_cartesian(xlim = c(-700,500), ylim = c(-300,300)) +
-    guides(colour = guide_legend(override.aes = list(alpha = 1, size = 3))) +
-    theme_bw()
-  print(p)
-  
-  p <- ggplot(df_pca_subset, aes(PC1, PC2, color = cell_cycle_state)) +
-    geom_point(size = .5, alpha = .3) +
-    #coord_cartesian(xlim = c(-700,500), ylim = c(-300,300)) +
-    guides(colour = guide_legend(override.aes = list(alpha = 1, size = 3))) +
-    theme_bw()
-  print(p)
-  
-  p <- ggplot(df_pca_subset, aes(PC1, PC2, color = length)) +
-    geom_point(size = .5, alpha = .3) +
-    #coord_cartesian(xlim = c(-700,500), ylim = c(-300,300)) +
-    guides(colour = guide_legend(override.aes = list(alpha = 1, size = 3))) +
-    theme_bw()
-  print(p)
-  
-  p <- ggplot(df_pca_subset, aes(PC1, PC2, color = Cell_CC_mean_intensity_ratio)) +
-    geom_point(size = .5, alpha = .3) +
-    #coord_cartesian(xlim = c(-700,500), ylim = c(-300,300)) +
-    guides(colour = guide_legend(override.aes = list(alpha = 1, size = 3))) +
-    theme_bw()
-  print(p)
-  
-  p <- ggplot(df_pca_subset, aes(PC1, PC2, color = lineage)) +
-    geom_point(size = .5, alpha = .3) +
-    #coord_cartesian(xlim = c(-700,500), ylim = c(-300,300)) +
-    guides(colour = guide_legend(override.aes = list(alpha = 1, size = 3))) +
-    theme_bw()
-  print(p)
-  
-  p <- ggplot(df_pca_subset, aes(PC1, PC2, color = migration_distance)) +
-    geom_point(size = .5, alpha = .3) +
-    #coord_cartesian(xlim = c(-700,500), ylim = c(-300,300)) +
-    guides(colour = guide_legend(override.aes = list(alpha = 1, size = 3))) +
-    theme_bw()
-  print(p)
-  
-  p_contour <- ggplot(df_pca_subset, aes(x=PC1, y=PC2) ) +
-    stat_density_2d(aes(fill = ..level..), geom = "polygon", colour="white") +
-    theme_bw()
-  print(p_contour)
-  
-  p <- ggplot(df_pca_subset, aes(x=PC1, y=PC2) ) +
-    geom_density_2d_filled() +
-    geom_density_2d(size = 0.25, colour = "black", bins = 25) +
-    #coord_cartesian(xlim = c(-700,500), ylim = c(-300,300)) +
-    guides(level = "none",
-           fill = "none") +
-    theme_bw()
-  print(p)
-  
-  res <- dev.off()
-}
 
-create_density_plots <- function(plateID){
+
+create_control_density_plots <- function(plateID){
   l1_data_path <- paste0(data_path,plateID,"/Analysis/",pipeline_name,"/",plateID,"_level_1.csv")
   
   df <- datasets[[plateID]][["l1_subset"]]
@@ -328,10 +245,12 @@ create_density_plots <- function(plateID){
   
   p_untreated <- ggplot(df_untreated, aes(Cell_CC_mean_intensity_ratio)) +
     geom_density(alpha = .2, color = "royalblue", fill = "royalblue")+
+    geom_vline(xintercept = unique(df_untreated$cell_cycle_state_threshold)) +
     theme_bw()
   
-  p_untreated_by_time <- ggplot(df_untreated, aes(Cell_CC_mean_intensity_ratio, fill = treatment, color = treatment)) +
-    geom_density(alpha = .2)+
+  p_untreated_by_time <- ggplot(df_untreated, aes(Cell_CC_mean_intensity_ratio)) +
+    geom_density(alpha = .2, color = "royalblue", fill = "royalblue")+
+    geom_vline(xintercept = unique(df_untreated$cell_cycle_state_threshold)) +
     scale_color_manual(values = cols) +
     scale_fill_manual(values = cols) +
     guides(fill = "none", color = "none") +
@@ -472,9 +391,9 @@ show_cell_cycle_plots <- function(plateID){
   
   set.seed(42)
   df_selected<- df %>%
-    filter(well %in% c("A1", "D6")) %>%
+    #filter(well %in% c("A1","A2","A3","A5","B1","B2","C1","C2","D1","D2")) %>%
     filter(migration_distance  < 5,
-           length>10) %>%
+           length>20) %>%
     mutate(field_label = paste0(field, "_", label)) %>%
     group_by(plateID, well) %>%
     filter(field_label %in% sample(unique(field_label), size = 5, replace = FALSE)) %>%
@@ -492,15 +411,15 @@ show_cell_cycle_plots <- function(plateID){
     arrange(well, field, label)
   
   p_cell_cycle_states <- ggplot(df_selected, aes(elapsed_minutes, Cell_CC_mean_intensity_ratio, color = cell_cycle_state)) +
-    geom_point(aes(y = Cyto_CC_area_t0norm, group = label), color = "blueviolet") +
-    geom_point(aes(y = migration_distance, group = label), color = "brown", alpha = .5) +
+    geom_point(aes(y = Cyto_CC_area_t0norm, group = label), color = "blueviolet", size = .5) +
+    geom_point(aes(y = log10(migration_distance), group = label), color = "brown", alpha = .5, size = .5) +
     geom_point(aes(group = label), size = .7) +
     labs(title = "Cell cycle measurements",
          subtitle="purple: area\nbrown: migration") +
     xlab("time") +
     ylab("") +
     theme(axis.text.x = element_text(angle = 90)) +
-    coord_cartesian(ylim = c(0,10)) +
+    coord_cartesian(ylim = c(0,5)) +
     theme_bw() +
     theme(strip.background = NULL,
           strip.text = element_text(size = 6)) +
@@ -580,6 +499,16 @@ generate_l2_plots <- function(plateID){
     ylab("intensity") +
     facet_wrap(~well, ncol = 2)
   p_cyto_CC_ratio
+  
+  p_g1_proportion <- ggplot(df, aes(x = hours, y = G1_proportion, color = factor(field))) +
+    geom_path() +
+    stat_summary(fun=mean, aes(group=1), geom="line", colour="blue") +
+    scale_x_continuous(breaks = c(0,24,48,72,96)) +
+    labs(title = "G1 proportion, mean") +
+    xlab("hours") +
+    ylab("proportion") +
+    facet_wrap(~well, ncol = 2)
+  p_g1_proportion
   
   #summarize each well and group plots by drug
   df_control_mean <- df %>%
@@ -662,6 +591,7 @@ generate_l2_plots <- function(plateID){
   pdf(paste0(plot_path,plateID,"_",pipeline_name,"_QA.pdf"), width = 10, height = 14)
   print(p_n)
   print(p_n_T0)
+  print(p_g1_proportion)
   print(p_cyto_CC_ratio)
   res <- dev.off()
   
@@ -677,24 +607,24 @@ generate_l2_plots <- function(plateID){
 
 data_path <-  "/home/exacloud/gscratch/HeiserLab/images/"
 pipeline_name <- "CtcK"
-plateIDs <- c("HC01301" = "HC01301")
+plateIDs <- c("HC00701" = "HC00701", "HC00801" = "HC00801", "HC00901" = "HC00901", "HC01001" = "HC01001", "HC01401" = "HC01401")
+plateIDs <- c("HC00701" = "HC00701")
 
 datasets <- map(plateIDs, read_plate_l1)
 res <- map(plateIDs, generate_l2_plots)
 
 #####These all need to be debugged
-#res <- map(plateIDs, create_control_density_plots)
+res <- map(plateIDs, create_control_density_plots)
+res <- map(plateIDs, show_cell_cycle_plots)
+res <- map(plateIDs, create_lineage_pdf, wll = "A1", fld = 2)
+res <- map(plateIDs, create_lineage_pdf, wll = "B1", fld = 2)
+res <- map(plateIDs, create_lineage_pdf, wll = "C1", fld = 2)
+res <- map(plateIDs, create_lineage_pdf, wll = "D2", fld = 2)
+res <- map(plateIDs, create_lineage_pdf, wll = "B3", fld = 2)
+res <- map(plateIDs, create_lineage_pdf, wll = "C3", fld = 2)
+res <- map(plateIDs, create_lineage_pdf, wll = "D4", fld = 2)
+res <- map(plateIDs, create_lineage_pdf, wll = "B5", fld = 2)
+res <- map(plateIDs, create_lineage_pdf, wll = "C5", fld = 2)
+res <- map(plateIDs, create_lineage_pdf, wll = "D6", fld = 2)
 
-# res <- map(plateIDs, create_lineage_pdf, wll = "A1", fld = 2)
-# res <- map(plateIDs, create_lineage_pdf, wll = "B1", fld = 2)
-# res <- map(plateIDs, create_lineage_pdf, wll = "C1", fld = 2)
-# res <- map(plateIDs, create_lineage_pdf, wll = "D2", fld = 2)
-# res <- map(plateIDs, create_lineage_pdf, wll = "B3", fld = 2)
-# res <- map(plateIDs, create_lineage_pdf, wll = "C3", fld = 2)
-# res <- map(plateIDs, create_lineage_pdf, wll = "D4", fld = 2)
-# res <- map(plateIDs, create_lineage_pdf, wll = "B5", fld = 2)
-# res <- map(plateIDs, create_lineage_pdf, wll = "C5", fld = 2)
-# res <- map(plateIDs, create_lineage_pdf, wll = "D6", fld = 2)
-
-#res <- map(plateIDs, show_cell_cycle_plots)
 
