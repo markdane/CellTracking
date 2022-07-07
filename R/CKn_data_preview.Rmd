@@ -53,9 +53,10 @@ read_process_l2_data <- function(l2_data_path){
   treatment_levels = c("vehicle",
                      "control",
                      "untreated_0",
+                     "Untreated",
                      "Lapatinib_25", "Lapatinib_50", "Lapatinib_100", "Lapatinib_250",
                      
-                     "Palbociclib_25", "Palbociclib_50", "Palbociclib_100",  "Palbociclib_250" ,
+                     "Palbociclib_25", "Palbociclib_50", "Palbociclib_100",  "Palbociclib_250" ,"Palbociclib_500" ,"Palbociclib_1000" ,"Palbociclib_2500" ,"Palbociclib_5000" ,
                      "Gemcitabine_5", "Gemcitabine_10", "Gemcitabine_17", "Gemcitabine_30",
                      "Gemcitabine_100",
                      "Palbociclib_25_Gemcitabine_10",
@@ -68,7 +69,7 @@ read_process_l2_data <- function(l2_data_path){
           "Doxorubicin_25","Doxorubicin_50" , "Doxorubicin_125" ,"Doxorubicin_250",
                     "Gemcitabine_0.25", "Gemcitabine_0.5", "Gemcitabine_1",
           "Gemcitabine_1.5","Gemcitabine_2", "Gemcitabine_2.5","Gemcitabine_3",
-                     "Paclitaxel_2",
+                     "Paclitaxel_1","Paclitaxel_1.7","Paclitaxel_2","Paclitaxel_2.4","Paclitaxel_3.1","Paclitaxel_3.8","Paclitaxel_4.5","Paclitaxel_5",
                      "Paclitaxel_2_Lapatinib_100",
                      "Paclitaxel_2_Doxorubicin_20",
                      "Paclitaxel_2_Palbociclib_50",
@@ -100,9 +101,11 @@ read_process_l2_data <- function(l2_data_path){
                                   Cell_CKn_CC_max_intensity_ratio = col_double(),
                                   Cell_CKn_CC_min_intensity_ratio = col_double(),
                                   cell_count_norm_T0 = col_double(),
-                                  G1_proportion = col_double()
+                                  G1_proportion = col_double(),
+                                  cell_cycle_state_threshold = col_double()
                  )) %>%
-    mutate(treatment = factor(treatment, levels = treatment_levels, ordered = TRUE))
+    mutate(treatment = factor(treatment, levels = treatment_levels, ordered = TRUE),
+           hours = elapsed_minutes/60)
   return(l2)
 }
 
@@ -139,13 +142,11 @@ process_tracks_file <- function(tracks_filename){
   return(tracks_lineages)
 }
     
-create_level_2_data <- function(plateID, data_path = "/home/exacloud/gscratch/HeiserLab/images/", pipeline_name = "CKn"){
+create_datasets <- function(plateID, data_path = "/home/exacloud/gscratch/HeiserLab/images/", pipeline_name = "CKn"){
   l1_data_path <- paste0(data_path,plateID,"/Analysis/",pipeline_name,"/",plateID,"_level_1.csv")
   l2_data_path <- paste0(data_path,plateID,"/Analysis/",pipeline_name,"/",plateID,"_level_2.csv")
 
-  g1_threshold <- .82
-
-
+  #g1_threshold <- .82
   if(!file.exists(l1_data_path)){
     print(paste("creating new level 1 file for",plateID))
     l1_data <- map_dfr(dir(paste0(data_path,plateID,"/Analysis/",pipeline_name),pattern = paste0(plateID,"_.*_level_1.csv"), full.names = TRUE), read_csv,
@@ -186,15 +187,12 @@ create_level_2_data <- function(plateID, data_path = "/home/exacloud/gscratch/He
              drugs =  paste(Drug1 ,Drug2, sep = "_"),
              drugs = str_remove_all(drugs, "_none|_0"),
              treatment =  paste(Drug1, Drug1Concentration,Drug2, Drug2Concentration, sep = "_"),
-             treatment = str_remove_all(treatment, "_none|_0"),
-            # treatment = factor(treatment, levels = treatment_levels, ordered = TRUE),
-             cell_cycle_state = case_when(Cell_CKn_CC_mean_intensity_ratio <= g1_threshold ~"G1",
-                                          Cell_CKn_CC_mean_intensity_ratio > g1_threshold ~"S/G2")) %>%
-      filter(!elapsed_minutes %in% c(0, 30, 60, 90, 120, 150, 180, 210, 240)) 
-    
+             treatment = str_remove_all(treatment, "_none|_0")) 
      #add in lineage tracks data
   tracks_df <- map_dfr(dir(paste0(data_path, plateID), pattern = "tracks.csv", recursive = TRUE, full.names = TRUE),
-process_tracks_file)
+process_tracks_file) %>%
+    mutate(plateID = as.character(plateID))
+  
   l1 <- l1_data %>%
     left_join(tracks_df, by = c("plateID", "well", "field", "label"))
     
@@ -202,23 +200,50 @@ process_tracks_file)
     
     l1 <- read_process_l1_data(l1_data_path)
     
-    G1_prop <- function(x){
-      G1_proportion <- 0
-      if(any("G1" %in% x)) G1_proportion <- table(x)[["G1"]]/length(x)
-      return(G1_proportion)
-      }
-
-    l2 <- l1 %>%
-      group_by(plateID, well, field, elapsed_minutes, treatment, drugs, Drug1,
-               Drug1Concentration, Drug2, Drug2Concentration) %>%
-      summarise(n = n(),
-                Nuclei_CKn_CC_mean_intensity=mean(Nuclei_CKn_CC_mean_intensity),
-                Cyto_CKn_CC_mean_intensity=mean(Cyto_CKn_CC_mean_intensity),
-                Cell_CKn_CC_mean_intensity_ratio=mean(Cell_CKn_CC_mean_intensity_ratio),
-                Cell_CKn_CC_max_intensity_ratio=mean(Cell_CKn_CC_max_intensity_ratio),
-                Cell_CKn_CC_min_intensity_ratio=mean(Cell_CKn_CC_min_intensity_ratio),
-                G1_proportion=G1_prop(cell_cycle_state),
-                .groups = "drop")
+    # G1_prop <- function(x){
+    #   G1_proportion <- 0
+    #   if(any("G1" %in% x)) G1_proportion <- table(x)[["G1"]]/length(x)
+    #   return(G1_proportion)
+    #   }
+ l2 <- map_dfr(dir(paste0(data_path,plateID,"/Analysis/",pipeline_name),pattern = paste0(plateID,"_.*_level_2.csv"), full.names = TRUE), read_csv,
+              col_types =cols(.default = "c",
+                             well = col_character(),
+                              field = col_double(),
+                              time_slice = col_character(),
+                             n = col_double(),
+                              Cell_CKn_CC_mean_intensity_ratio = col_double(),
+                              Cell_CKn_CC_max_intensity_ratio = col_double(),
+                              Cell_CKn_CC_min_intensity_ratio = col_double(),
+                              length = col_double()
+              )) %>%
+      mutate(plateID = plateID,
+             day = str_remove(time_slice, "d.*"),
+             day = as.integer(day),
+             hour = str_extract(time_slice, "[0-9]*h"),
+             hour = str_remove(hour, "h"),
+             hour = as.integer(hour),
+             minute = str_extract(time_slice, "[0-9]*m"),
+             minute = str_remove(minute, "m"),
+             minute = as.integer(minute),
+             elapsed_minutes = day*24*60+hour*60+minute,
+             elapsed_minutes = case_when(elapsed_minutes%%30 == 0 ~elapsed_minutes,
+                                         elapsed_minutes%%30 == 3 ~elapsed_minutes-3),
+             drugs =  paste(Drug1 ,Drug2, sep = "_"),
+             drugs = str_remove_all(drugs, "_none|_0"),
+             treatment =  paste(Drug1, Drug1Concentration,Drug2, Drug2Concentration, sep = "_"),
+             treatment = str_remove_all(treatment, "_none|_0")) 
+    # 
+    # l2 <- l1 %>%
+    #   group_by(plateID, well, field, elapsed_minutes, treatment, drugs, Drug1,
+    #            Drug1Concentration, Drug2, Drug2Concentration) %>%
+    #   summarise(n = n(),
+    #             Nuclei_CKn_CC_mean_intensity=mean(Nuclei_CKn_CC_mean_intensity),
+    #             Cyto_CKn_CC_mean_intensity=mean(Cyto_CKn_CC_mean_intensity),
+    #             Cell_CKn_CC_mean_intensity_ratio=mean(Cell_CKn_CC_mean_intensity_ratio),
+    #             Cell_CKn_CC_max_intensity_ratio=mean(Cell_CKn_CC_max_intensity_ratio),
+    #             Cell_CKn_CC_min_intensity_ratio=mean(Cell_CKn_CC_min_intensity_ratio),
+    #             G1_proportion=G1_prop(cell_cycle_state),
+    #             .groups = "drop")
     
     #normalize to earliest time point
     earliest_time_point <- unique(l2$elapsed_minutes) %>%
@@ -312,7 +337,7 @@ cols <- c("BEZ235_1" = "cornflowerblue", "Cabozantinib_50" = "cornflowerblue", "
           "Gemcitabine_0.25" = "cornflowerblue", "Gemcitabine_0.5"= "darkcyan", "Gemcitabine_1" = "cadetblue4",
           "Gemcitabine_1.5" = "cadetblue","Gemcitabine_2"= "blue", "Gemcitabine_2.5" = "blue3","Gemcitabine_3" = "darkblue")
 
-  g1_threshold <- .82
+  g1_threshold <- unique(l2$cell_cycle_state_threshold)
 
 #hack to deal with bortexomib_50 used once as a low dosage and another time as a high doasge
   if("Bortezomib_1" %in% l2$treatment){
@@ -371,52 +396,96 @@ cols <- c("BEZ235_1" = "cornflowerblue", "Cabozantinib_50" = "cornflowerblue", "
     theme(strip.text = element_text(size = 5))
   p_n_t_T0
   
-  # #summarize each well and group plots by drug
-  # l2_control_mean <- l2 %>%
-  #   filter(treatment %in% c("vehicle", "control")) %>%
-  #   group_by(elapsed_minutes) %>%
-  #   summarise(cell_count_norm_T0_control = mean(cell_count_norm_T0),
-  #             n_control = mean(n),
-  #             G1_proportion_control = mean(G1_proportion)) 
-  # 
-  #   l2_mean <- l2 %>%
-  #   filter(!treatment %in% c("vehicle", "control")) %>%
-  #   mutate(treatment = fct_drop(treatment)) %>%
-  #   group_by(elapsed_minutes, treatment, drugs, Drug1Concentration) %>%
-  #   summarise(cell_count_norm_T0 = mean(cell_count_norm_T0),
-  #             n = mean(n),
-  #             G1_proportion = mean(G1_proportion)) %>%
-  #     left_join(l2_control_mean, by = "elapsed_minutes")
-  #   
-  # 
-  # p_n_t_T0_mean <- ggplot(l2_mean, aes(x = elapsed_minutes, y = cell_count_norm_T0, color = treatment, group = Drug1Concentration)) +
-  #   geom_path() +
-  #   geom_path(aes(y = cell_count_norm_T0_control), color = "red")+
-  #   scale_y_continuous(trans = 'log2') +
-  #   scale_color_manual(values = cols) +
-  #   labs(title = "Cell counts for each treatment (T0 normed)",
-  #        subtitle = "organized by treatment and dosage",
-  #        xlab ="minutes",
-  #        ylab = "cell count (log2 spacing)") +
-  #   guides(color = "none") +
-  #   facet_wrap(~drugs, ncol = 6)+
-  #   theme(strip.text = element_text(size = 5)) +
-  #   theme_bw()
-  # p_n_t_T0_mean
-  # 
-  # p_G1_t_mean <- ggplot(l2_mean, aes(x = elapsed_minutes, y = G1_proportion, color = treatment, group = Drug1Concentration)) +
-  #   geom_path() +
-  #   scale_color_manual(values = cols) +
-  #   labs(title = "G1 proportion for each treatment",
-  #        subtitle = "organized by treatment and dosage",
-  #        xlab ="minutes",
-  #        ylab = "G1 proportion") +
-  #   guides(color = "none") +
-  #   facet_wrap(~drugs, ncol = 6)+
-  #   theme(strip.text = element_text(size = 5)) +
-  #   theme_bw()
-  # p_G1_t_mean
-  # 
+  #summarize each well and group plots by drug
+  l2_control_mean <- l2 %>%
+    filter(treatment %in% c("vehicle", "control", "Untreated")) %>%
+    group_by(elapsed_minutes, hours) %>%
+    summarise(cell_count_norm_T0_control = mean(cell_count_norm_T0),
+              n_control = mean(n),
+              G1_proportion_control = mean(G1_proportion))
+
+    l2_mean <- l2 %>%
+    filter(!treatment %in% c("vehicle", "control", "Untreated")) %>%
+    mutate(treatment = fct_drop(treatment)) %>%
+    group_by(elapsed_minutes, treatment, drugs, Drug1Concentration) %>%
+    summarise(cell_count_norm_T0 = mean(cell_count_norm_T0),
+              n = mean(n),
+              G1_proportion = mean(G1_proportion)) %>%
+      left_join(l2_control_mean, by = "elapsed_minutes")
+    
+      l2_mean_select <- l2_mean %>%
+    filter(hours %in% c(0, 24, 48, 72, 96)) %>%
+    arrange(drugs, Drug1Concentration)
+######
+        #summarize each well and group plots by drug
+  l2_control_mean <- l2 %>%
+    filter(treatment %in% c("vehicle", "control", "Untreated")) %>%
+    group_by(elapsed_minutes) %>%
+    summarise(cell_count_norm_T0_control = mean(cell_count_norm_T0),
+              n_control = mean(n),
+              G1_proportion_control = mean(G1_proportion),
+               .groups = "drop")
+      
+       l2_mean <- l2 %>%
+    filter(!treatment %in% c("vehicle", "control", "Untreated")) %>%
+    mutate(treatment = fct_drop(treatment)) %>%
+    group_by(elapsed_minutes, treatment, drugs, Drug1Concentration) %>%
+    summarise(cell_count_norm_T0 = mean(cell_count_norm_T0),
+              n = mean(n),
+              G1_proportion = mean(G1_proportion), .groups = "drop") %>%
+    left_join(l2_control_mean, by = "elapsed_minutes")%>%
+    mutate(hours = as.integer(elapsed_minutes)/60,
+           hours = as.character(hours),
+           hours = fct_inseq(hours, ordered = TRUE),
+           cell_count_norm_control = n/n_control)
+  
+  l2_mean_select <- l2_mean %>%
+    filter(hours %in% c(0, 24, 48, 72, 96)) %>%
+    arrange(drugs, Drug1Concentration)
+  
+  
+
+  p_n_t_T0_mean <- ggplot(l2_mean, aes(x = elapsed_minutes, y = cell_count_norm_T0, color = treatment, group = Drug1Concentration)) +
+    geom_path() +
+    geom_path(aes(y = cell_count_norm_T0_control), color = "red")+
+    scale_y_continuous(trans = 'log2') +
+    scale_color_manual(values = cols) +
+    labs(title = "Cell counts for each treatment (T0 normed)",
+         subtitle = "organized by treatment and dosage",
+         xlab ="minutes",
+         ylab = "cell count (log2 spacing)") +
+    guides(color = "none") +
+    facet_wrap(~drugs, ncol = 6)+
+    theme(strip.text = element_text(size = 5)) +
+    theme_bw()
+  p_n_t_T0_mean
+
+  p_G1_t_mean <- ggplot(l2_mean, aes(x = elapsed_minutes, y = G1_proportion, color = treatment, group = Drug1Concentration)) +
+    geom_path() +
+    scale_color_manual(values = cols) +
+    labs(title = "G1 proportion for each treatment",
+         subtitle = "organized by treatment and dosage",
+         xlab ="minutes",
+         ylab = "G1 proportion") +
+    guides(color = "none") +
+    facet_wrap(~drugs, ncol = 6)+
+    theme(strip.text = element_text(size = 5)) +
+    theme_bw()
+  p_G1_t_mean
+
+   concentration_colors <-  rep(viridis(7, direction = -1), length.out = 7)
+  
+ p_cell_count_dose_response_conc <- ggplot(l2_mean_select, aes(x = Drug1Concentration, y = cell_count_norm_control, color = hours, group = hours)) +
+    geom_path() +
+    scale_color_manual(values = concentration_colors) +
+    labs(title = "Dose response curves for cell count") +
+    xlab("Drug concentration") +
+    ylab("Cell count (normalized to control)") +   
+    guides(color = guide_legend("Hours")) +
+    theme_bw()+
+    theme(axis.text.x = element_text(angle = 0))+
+    facet_wrap(~factor(drugs), ncol = 4, scales = "free_x")
+  p_cell_count_dose_response_conc
   
   p_CC <- ggplot(l2, aes(x = elapsed_minutes, y = Nuclei_CKn_CC_mean_intensity, color = factor(field))) +
     geom_path() +
@@ -509,63 +578,34 @@ cols <- c("BEZ235_1" = "cornflowerblue", "Cabozantinib_50" = "cornflowerblue", "
   #   theme_bw()
   # p
   
-  pdf(paste0(data_path,plateID,"/Analysis/",pipeline_name,"/plots/",plateID,"_QA.pdf"), width = 10, height = 14)
-  # print(p_n_t_T0_mean)
-  # print(p_G1_t_mean)
-  print(p_densities)
-  print(p_n_t_T0)
-  print(p_cyto_CC_t_ratio)
-  print(p_CC_t)
+  # pdf(paste0(data_path,plateID,"/Analysis/",pipeline_name,"/plots/",plateID,"_QA.pdf"), width = 10, height = 14)
+  # # print(p_n_t_T0_mean)
+  # # print(p_G1_t_mean)
+  # print(p_densities)
+  # print(p_n_t_T0)
+  # print(p_cyto_CC_t_ratio)
+  # print(p_CC_t)
+  # print(p_n)
+  # print(p_n_T0)
+  # print(p_cyto_CC_t)
+  # res <- dev.off()
+  
+   plot_path <- paste0(data_path,plateID,"/Analysis/",pipeline_name,"/plots/")
+  if(!dir.exists(plot_path)) dir.create(plot_path)
+  
+  pdf(paste0(plot_path,plateID,"_QA.pdf"), width = 10, height = 14)
   print(p_n)
   print(p_n_T0)
-  print(p_cyto_CC_t)
+  print(p_cyto_CC_ratio)
   res <- dev.off()
   
-}
-
-compare_to_CP <- function(plateID, l2){
-  plate_CP_data <- map_dfr(dir(path = "../CP_data", pattern = paste0(plateID,".csv"),full.names = TRUE), read_csv) %>%
-    mutate(well_column = str_remove(Metadata_Well, "[A-Z]") %>%
-             sprintf("%02s", .),
-           well_row = str_remove(Metadata_Well, "[[:digit:]*]"),
-           #        Metadata_Well = paste0(well_row, well_column),
-           Time_slice_index = (ImageNumber-1)%% 193+1,
-           elapsed_minutes = (Time_slice_index-1)*30) %>%  #need to deal with time slices that differ by 3 minutes, sometimes
-
-    select(Metadata_Well, Metadata_Site, Count_Nuclei, Time_slice_index,elapsed_minutes)
-  
-  
-  l2_CKn_CP <- l2 %>%
-    right_join(plate_CP_data, by = c("well"= "Metadata_Well", "field" = "Metadata_Site", "elapsed_minutes" = "elapsed_minutes")) 
-  
-  cell_counts_CKn_CP <- l2_CKn_CP %>%
-    select(well, treatment, field, n, Count_Nuclei, elapsed_minutes) %>%
-    pivot_longer(cols = c(n, Count_Nuclei), names_to = "pipeline", values_to = "Cell_count") %>%
-    mutate(pipeline = case_when(pipeline =="n" ~"python_ilastik",
-                                pipeline == "Count_Nuclei" ~"CellProfiler"))
-  
-  p_CKn_CP <- ggplot(cell_counts_CKn_CP, aes(x = elapsed_minutes, y = Cell_count, color = pipeline, shape = pipeline)) +
-    geom_point(size = .5, alpha = .8) +
-    theme_bw()+
-    theme(strip.text.y = element_text(size = 4)) +
-    facet_grid(well+treatment~field, scales = "free_y")
-  p_CKn_CP
-  
-  #compare pipeline results directly
-  cell_counts_CKn_CP_wide <- cell_counts_CKn_CP %>%
-    pivot_wider(names_from = pipeline, values_from = Cell_count)
-  
-  p_PIvsCP <- ggplot(cell_counts_CKn_CP_wide, aes(x = CellProfiler, y = python_ilastik)) +
-    geom_point(size = .5, alpha = .8) +
-    coord_cartesian(xlim = c(0,800), ylim = c(0,800)) +
-    theme_bw()+
-    facet_grid(well~field)
-  p_PIvsCP
-  
-  pdf(paste0(data_path,plateID,"/Analysis/",pipeline_name,"/plots/",plateID,"_cell_count_pipeline_comparison.pdf"), height = 24)
-  print(p_CKn_CP)
-  print(p_PIvsCP)
+  pdf(paste0(plot_path, plateID,"_summary.pdf"), width = 10, height = 7)
+  print(p_n_t_T0_mean)
+  print(p_G1_t_mean)
+  #print(p_cell_count_dose_response)
+  print(p_cell_count_dose_response_conc)
   res <- dev.off()
+  
   
 }
 
@@ -679,28 +719,17 @@ res <- create_lineage_pdf(l1, plateID, "C2", 2)
 ```{r visualize_data}
 
 process_plate<- function(plateID, ...){
-  datasets <- create_level_2_data(plateID, data_path = data_path)
-  #datasets <- create_level_2_data(plateID, data_path = data_path)
+  datasets <- create_datasets(plateID, data_path = data_path)
 
   #process track files
   generate_plots(plateID, datasets$l1, datasets$l2)
   #generate_lineage_plots(plateID, datasets$l1, datasets$l2)
- #compare_to_CP(plateID, l2)
 }
 
 data_path <- "/home/exacloud/gscratch/HeiserLab/images/"
-#data_path <- "/Users/dane/Documents/CellTrackingProjects/AU565/images/"
 pipeline_name <- "CKn"
-plateID <- "HC00701"
+plateID <- c("2100601")
 
+res <- map(plateID, process_plate, data_path = data_path)
 
-
-#datasets <- create_level_2_data(plateID, data_path = data_path)
-
-res <- map(c("HC00701"), process_plate, data_path = data_path)
-
-
-  
-#res <- map(c("AU01901","AU02001","AU02002", "AU02101"), process_plate)
-#res <- map(c("AU01501","AU01601","AU01701","AU01702","AU01801","AU01802","AU01901","AU01902","AU02001","AU02002","AU02101","AU02301","AU02401", "AU02501"), process_plate)
 ```
