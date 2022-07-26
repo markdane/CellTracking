@@ -1,0 +1,177 @@
+---
+title: "Live cell imaging field-level responses"
+output: 
+  html_document:
+  code_folding: hide
+---
+
+```{r setup, include=FALSE, cache=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+
+library(tidyverse)
+library(viridis)
+```
+
+
+```{r get_data}
+
+
+generate_summary_plots <- function(df, cellLine){
+
+    #dynamically assign consistent colors to the dosage concentrations
+  treatments <-df$treatment%>%
+    unique()  %>%
+    str_sort(numeric = TRUE)
+  idx <- which(treatments %in% c("control","vehicle","Untreated")) # Positions of Untreated in df$treatement
+  treatments <- treatments[-idx]
+  treatments_colors <-  rep(viridis(7, direction = -1), length.out = length(treatments))
+  names(treatments_colors) <- treatments
+  cols <- c("control"="royalblue","vehicle"="royalblue","Untreated"="royalblue", treatments_colors)
+  
+  #summarize each well and group plots by drug
+  df_control_mean <- df %>%
+    filter(treatment %in% c("vehicle", "control", "Untreated")) %>%
+    group_by(hours) %>%
+    summarise(cell_count_norm_T0_control = mean(cell_count_norm_T0),
+              n_control = mean(n),
+              G1_proportion_control = mean(G1_proportion),
+              multi_proportion_control = mean(Cell_NR_proportion_multinucleated_cells),
+               .groups = "drop")
+  
+  df_mean <- df %>%
+    filter(!treatment %in% c("vehicle", "control", "Untreated")) %>%
+    mutate(treatment = fct_drop(treatment)) %>%
+    group_by(hours, treatment, drugs, Drug1Concentration) %>%
+    summarise(cell_count_norm_T0 = mean(cell_count_norm_T0),
+              n = mean(n),
+              G1_proportion = mean(G1_proportion),
+              multi_proportion = mean(Cell_NR_proportion_multinucleated_cells),
+              .groups = "drop") %>%
+    left_join(df_control_mean, by = "hours")%>%
+    mutate(hours = as.character(hours),
+           hours = fct_inseq(hours,ordered = TRUE),
+           cell_count_norm_control = n/n_control)
+  
+  df_mean_select <- df_mean %>%
+    filter(hours %in% c(0, 24, 48, 72, 96)) %>%
+    arrange(drugs, Drug1Concentration)
+
+
+  p_n_t_T0_mean <- ggplot(df_mean, aes(x = hours, y = cell_count_norm_T0, color = treatment, group = Drug1Concentration)) +
+    geom_path() +
+    geom_path(aes(y = cell_count_norm_T0_control), color = "firebrick4")+
+    scale_x_discrete(breaks = c(0,24,48,72,96)) +
+    scale_y_continuous(trans = 'log2', breaks = c(.75,1,2,3)) +
+    scale_color_manual(values = cols) +
+    labs(title = paste(cellLine, "cell counts for each treatment (T0 normed)"),
+         subtitle = "dosage concentration increases from yellow to purple, control in red") +
+    xlab("hours") +
+    ylab("cell count (log2 spacing)") +
+    guides(color = "none") +
+    facet_wrap(~drugs, ncol = 6)+
+    theme(strip.text = element_text(size = 5)) +
+    theme_bw()
+  p_n_t_T0_mean
+  
+  p_G1_t_mean <- ggplot(df_mean, aes(x = hours, y = G1_proportion, color = treatment, group = Drug1Concentration)) +
+    geom_path() +
+    geom_path(aes(y = G1_proportion_control), color = "firebrick4")+
+    scale_x_discrete(breaks = c(0,24,48,72,96)) +
+    scale_color_manual(values = cols) +
+    labs(title = paste(cellLine, "G1 proportion for each treatment"),
+         subtitle = "dosage concentration increases from yellow to purple, control in red") +
+    xlab("hours") +
+    ylab("G1 proportion") +
+    guides(color = "none") +
+    facet_wrap(~drugs, ncol = 6)+
+    theme(strip.text = element_text(size = 5)) +
+    theme_bw()
+  p_G1_t_mean
+  
+  
+   p_multi_nucs <- ggplot(df_mean, aes(x = hours, y = multi_proportion, color = treatment, group = Drug1Concentration)) +
+    #geom_path() +
+    geom_smooth()+
+    geom_smooth(aes(y = multi_proportion_control), color = "firebrick4")+
+    scale_x_discrete(breaks = c(0,24,48,72,96)) +
+    scale_color_manual(values = cols) +
+    labs(title = paste(cellLine, "multi-nucleated proportion for each treatment"),
+         subtitle = "organized by treatment and dosage") +
+    xlab("hours") +
+    ylab("proportion") +
+    guides(color = "none") +
+    facet_wrap(~drugs, ncol = 6)+
+    theme(strip.text = element_text(size = 5)) +
+    theme_bw()
+  p_multi_nucs
+  
+  drug_cols <-rep(viridis(7, direction = -1), length.out = length(unique(df_mean_select$hours)))
+names(drug_cols) <- unique(df_mean_select$hours)
+    
+  #add untreated as the rank 0 value
+  df_mean_select_0 <- df_mean_select %>%
+    select(drugs, hours) %>%
+    distinct() %>%
+    mutate(Drug1Concentration = 0,
+           cell_count_norm_control = 1) %>%
+    bind_rows(df_mean_select)
+  
+    drug_cols <-rep(viridis(7, direction = -1), length.out = length(unique(df_mean_select_0$hours)))
+names(drug_cols) <- unique(df_mean_select_0$hours)
+    
+
+# p_cell_count_dose_response <- ggplot(df_mean_select_0, aes(x = Drug1ConcentrationRank, y = cell_count_norm_control, color = hours, group = hours)) +
+#     geom_path() +
+#     labs(title = "Dose response curves for cell count",
+#          subtitle = "normalized to control") +
+#     xlab("Drug concentration rank") +
+#     ylab("Cell count") +   
+#     guides(color = guide_legend("Hours")) +
+#       scale_color_manual(values = drug_cols) +
+#     theme_bw()+
+#     facet_wrap(~factor(drugs), ncol = 6)
+#   p_cell_count_dose_response
+  
+  p_cell_count_dose_response_conc <- ggplot(df_mean_select_0, aes(x = Drug1Concentration, y = cell_count_norm_control, color = hours, group = hours)) +
+    geom_path() +
+    labs(title = paste(cellLine, "dose response curves for cell count"),
+         subtitle = "normalized to control") +
+    xlab("Drug concentration") +
+    ylab("Cell count") +   
+    guides(color = guide_legend("Hours")) +
+      scale_color_manual(values = drug_cols) +
+    theme_bw()+
+    theme(axis.text.x = element_text(size = 6)) +
+    facet_wrap(~factor(drugs), ncol = 6, scale = "free_x")
+  p_cell_count_dose_response_conc
+  
+  pdf(paste0(data_path,cellLine, "_summary_",pipeline_name,".pdf"), width = 10, height = 4)
+  print(p_n_t_T0_mean)
+  print(p_G1_t_mean)
+  print(p_multi_nucs)
+  #print(p_cell_count_dose_response)
+  print(p_cell_count_dose_response_conc)
+  res <- dev.off()
+}
+
+```
+
+
+
+```{r visualize_data}
+
+get_level_2_data <- function(plateID, data_path = "/home/exacloud/gscratch/HeiserLab/images/", pipeline_name = "CtcK"){
+  df <- read_csv(paste0(data_path, plateID,"/Analysis/",pipeline_name,"/",plateID,"_",pipeline_name,"_level_2.csv"), show_col_types = FALSE)
+}
+ 
+##########
+data_path <-  "/home/exacloud/gscratch/HeiserLab/images/"
+pipeline_name <- "CtcK"
+plateIDs <- c("HC00701" = "HC00701","HC00801" = "HC00801","HC00901" = "HC00901","HC01001" = "HC01001","HC01301" = "HC01301","HC01401" = "HC01401")
+plateIDs <- c("2101001" = "2101001","2101701" = "2101701","2101801" = "2101801")
+
+cellLine_l2 <- map_df(plateIDs, get_level_2_data, data_path = data_path) %>%
+  mutate(hours = elapsed_minutes/60)
+res <- generate_summary_plots(cellLine_l2, cellLine = "21MT1")
+
+```
