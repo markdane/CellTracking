@@ -1,12 +1,20 @@
 library(tidyverse)
 library(readxl)
 
-data_path <- "../../../images/"
-data_path <- "../images/"
+#cellLine <- "HCC1143"
+#cellLine <- "21MT1"
+cellLine <- "MDAMB157"
 
-plateIDs <- c("AU00601","AU00602","AU00701","AU00702","AU00801","AU00802","AU00901","AU00902","AU01001","AU01002","AU01101","AU01102")
+data_path <- "../../../../images/"
+#data_path <- "../images/"
+
+#plateIDs <- c("AU00601","AU00602","AU00701","AU00702","AU00801","AU00802","AU00901","AU00902","AU01001","AU01002","AU01101","AU01102")
+#plateIDs = c("HC00701","HC00801","HC00901","HC01001","HC01301","HC01401")
+#plateIDs = c("2101001","2101201","2101301","2101401","2101501","2101601","2101701","2101801")
+plateIDs = c("MD00301","MD00401","MD00501","MD00601","MD00701","MD00801")
+
 data_paths <- paste0(data_path, plateIDs)
-library_filepath <- "../metadata/AU565_library.csv"
+library_filepath <- paste0("../metadata/",cellLine,"_library.csv")
 
 if(!file.exists(library_filepath)){
   #read file names into a dataframe
@@ -28,7 +36,7 @@ if(!file.exists(library_filepath)){
            field = str_remove_all(field,"_"),
            timepoint = str_extract(filename, "[[:alnum:]]*.tif"),
            timepoint = str_remove_all(timepoint,".tif"))
-  write_csv(df, "../metadata/IDR/AU565_library.csv")
+  write_csv(df, paste0("../metadata/",cellLine,"_library.csv"))
 } else {
   df <- read_csv(library_filepath)
 }
@@ -129,7 +137,7 @@ df_data_metadata <- lapply(plateIDs, function(plateID){
          "Cell Line" = "Cellline",
          "Channels" = "channel_name")
 
-result <- write_tsv(df_data_metadata, "../metadata/AU565_library_all_metadata_test.tsv")
+result <- write_tsv(df_data_metadata, paste0("../metadata/",cellLine,"_library_all_metadata_test.tsv"))
 
 IDR_well_level_library <- df_data_metadata %>%
   select(Plate, Well, Organism, "Term Source 1 REF",
@@ -138,4 +146,4 @@ IDR_well_level_library <- df_data_metadata %>%
   mutate(Channels = "P:Phase contrast, R:Nuclear reporter, G:Cell cycle reporter")
 
 
-result <- write_tsv(IDR_well_level_library, "../metadata/AU565_library_metadata.tsv")
+result <- write_tsv(IDR_well_level_library, paste0("../metadata/",cellLine,"_library_metadata.tsv"))
