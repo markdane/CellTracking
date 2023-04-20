@@ -5,6 +5,7 @@ data_path <- "../../../../images/"
 dataset_name = "AU565_DS2"
 #plateIDs <- c("AU00601","AU00602","AU00701","AU00702","AU00801","AU00802","AU00901","AU00902","AU01001","AU01002","AU01101","AU01102")
 plateIDs <- c("AU01401","AU01501","AU01502","AU01601","AU01602","AU01701","AU01702","AU01801","AU01802","AU01901","AU01902","AU02001","AU02002","AU02101")
+plateIDs <- c("2101201","2101301")
 data_paths <- paste0(data_path, plateIDs)
 
 

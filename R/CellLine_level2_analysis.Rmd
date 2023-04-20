@@ -167,11 +167,15 @@ get_level_2_data <- function(plateID, data_path = "/home/exacloud/gscratch/Heise
 ##########
 data_path <-  "/home/exacloud/gscratch/HeiserLab/images/"
 pipeline_name <- "CtcK"
+pipeline_name <- "CtncK"
 plateIDs <- c("HC00701" = "HC00701","HC00801" = "HC00801","HC00901" = "HC00901","HC01001" = "HC01001","HC01301" = "HC01301","HC01401" = "HC01401")
-plateIDs <- c("2101001" = "2101001","2101701" = "2101701","2101801" = "2101801")
+plateIDs <- c("2101001" = "2101001","2101201" = "2101201","2101301" = "2101301", "2101401" = "2101401", "2101501" = "2101501", "2101601" = "2101601", "2101701" = "2101701","2101801" = "2101801")
+plateIDs <- c("MD00101" = "MD00101","MD00201" = "MD00201","MD00301" = "MD00301", "MD00401" = "MD00401", "MD00501" = "MD00501", "MD00601" = "MD00601", "MD00701" = "MD00701","MD00801" = "MD00801")
+plateIDs <- c("221006p1" = "221006p1","221006p2" = "221006p2")
+
 
 cellLine_l2 <- map_df(plateIDs, get_level_2_data, data_path = data_path) %>%
   mutate(hours = elapsed_minutes/60)
-res <- generate_summary_plots(cellLine_l2, cellLine = "21MT1")
+res <- generate_summary_plots(cellLine_l2, cellLine = "MDAMB157")
 
 ```
